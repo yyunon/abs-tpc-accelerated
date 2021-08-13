@@ -1,0 +1,649 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements. See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership. The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License. You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+/*
+ * Author: Lars van Leeuwen
+ * Code for running a Parquet to Arrow converter for 64 bit primitives on FPGA.
+ *
+ * Inputs:
+ *  parquet_hw_input_file_path: file_path to hardware compatible Parquet file
+ *  reference_parquet_file_path: file_path to Parquet file compatible with the standard Arrow library Parquet reading functions. 
+ *    This file should contain the same values as the first file and is used for verifying the hardware output.
+ *  num_val: How many values to read.
+ */
+
+#include <chrono>
+#include <memory>
+#include <vector>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <random>
+#include <stdlib.h>
+#include <unistd.h>
+#include <thread>
+#include <future>
+
+// Apache Arrow
+#include <arrow/api.h>
+#include <arrow/io/api.h>
+#include <parquet/api/reader.h>
+#include <parquet/arrow/writer.h>
+
+// Fletcher
+#include "fletcher/api.h"
+#include "FileReader.h"
+/* There are 2 kernel types:
+ * 1: predicate/filter
+ * 2: projection
+ */
+#define KERNEL_TYPE 2
+
+#define NUM_COLS 4
+#define REG_BASE 10
+//#define COL_OFFSET (1 << 10)
+#define PRIM_WIDTH 64
+
+constexpr uint64_t calculate_reg_base_offset(int i)
+{
+  return ((1 << 16) + i * (1 << 12));
+}
+
+void runColumn(int i, fletcher::Kernel kernel)
+{
+  //std::cout << "Reader " << i << "\n";
+  //kernel.Start();
+  kernel.WaitForFinish(10);
+}
+
+std::shared_ptr<arrow::RecordBatch> prepareFinalRecordBatch(int32_t num_val)
+{
+  std::vector<std::shared_ptr<arrow::Buffer>> buffer_vector(4);
+  int i = 0;
+  for (auto &values : buffer_vector)
+  {
+    uint64_t *values_ptr = nullptr;
+    size_t values_size;
+    if (i == 3)
+      values_size = sizeof(int32_t) * num_val;
+    else
+      values_size = sizeof(int64_t) * num_val;
+    int retval = posix_memalign(reinterpret_cast<void **>(&values_ptr), 4096, values_size);
+    if (retval)
+    {
+      printf("Error %d allocating aligned memory for output\n", retval);
+    }
+    memset(values_ptr, 0, values_size);
+    values = arrow::MutableBuffer::Wrap(values_ptr, num_val); //Wrap uses the sizeof of the template of the pointer
+    if (values->is_mutable())
+    {
+      printf("Buffer is mutable\n");
+    }
+    else
+    {
+      printf("Buffer is NOT mutable\n");
+    }
+    printf("allocated memory address 0x%p, size %d. arrow buffer mutable data address 0x%p, size %d\n", values_ptr, values_size, values->mutable_data(), values->size());
+    ++i;
+  }
+
+  std::shared_ptr<arrow::Schema> schema = arrow::schema({arrow::field("l_extendedprice", arrow::float64(), false), arrow::field("l_discount", arrow::float64(), false), arrow::field("l_quantity", arrow::float64(), false), arrow::field("l_shipdate", arrow::date32(), false)});
+
+  auto l_extendedprice_arr = std::make_shared<arrow::DoubleArray>(num_val, buffer_vector[0]);
+  auto l_discount_arr = std::make_shared<arrow::DoubleArray>(num_val, buffer_vector[1]);
+  auto l_quantity_arr = std::make_shared<arrow::DoubleArray>(num_val, buffer_vector[2]);
+  auto l_shipdate_arr = std::make_shared<arrow::Date32Array>(num_val, buffer_vector[3]);
+
+  // Final recordbatch
+  //std::vector<std::shared_ptr<arrow::Array>> output_arrs = {l_orderkey_arr, l_partkey_arr, l_suppkey_arr, l_linenumber_arr, l_quantity_arr, l_extendedprice_arr, l_discount_arr, l_tax_arr, l_returnflag_arr, l_linestatus_arr, l_shipdate_arr, l_commitdate_arr, l_receiptdate_arr, l_shipinstruct_arr, l_shipmode_arr, l_comment_arr};
+  std::vector<std::shared_ptr<arrow::Array>> output_arrs = {l_extendedprice_arr, l_discount_arr, l_quantity_arr, l_shipdate_arr};
+  auto recordbatch = arrow::RecordBatch::Make(schema, num_val, output_arrs);
+  return recordbatch;
+}
+
+void checkMMIO(uint64_t base_offset, std::shared_ptr<fletcher::Platform> platform, uint32_t num_val)
+{
+  uint32_t value32;
+
+  platform->ReadMMIO(base_offset, REG_BASE + 0, &value32);
+
+  std::cout << "MMIO num_val=" << value32 << ", should be " << num_val << std::endl;
+
+  //  for (int i = 1; i < 15; i++) {
+  //    platform->ReadMMIO(i, &value32);
+  //  }
+}
+std::shared_ptr<arrow::RecordBatch> prepareRecordBatchC1(int32_t num_val)
+{
+  std::shared_ptr<arrow::Buffer> values;
+  uint64_t *values_ptr = nullptr;
+  const size_t values_size = sizeof(int64_t) * num_val;
+  int retval = posix_memalign(reinterpret_cast<void **>(&values_ptr), 4096, values_size);
+  if (retval)
+  {
+    printf("Error %d allocating aligned memory for output\n", retval);
+  }
+  memset(values_ptr, 0, values_size);
+  values = arrow::MutableBuffer::Wrap(values_ptr, num_val); //Wrap uses the sizeof of the template of the pointer
+  if (values->is_mutable())
+  {
+    printf("Buffer is mutable\n");
+  }
+  else
+  {
+    printf("Buffer is NOT mutable\n");
+  }
+  printf("allocated memory address 0x%p, size %d. arrow buffer mutable data address 0x%p, size %d\n", values_ptr, values_size, values->mutable_data(), values->size());
+
+  std::shared_ptr<arrow::Schema> schema = arrow::schema({arrow::field("l_quantity", arrow::float64(), false)});
+
+  auto l_quantity_arr = std::make_shared<arrow::DoubleArray>(num_val, values);
+
+  // Final recordbatch
+  //std::vector<std::shared_ptr<arrow::Array>> output_arrs = {l_orderkey_arr, l_partkey_arr, l_suppkey_arr, l_linenumber_arr, l_quantity_arr, l_extendedprice_arr, l_discount_arr, l_tax_arr, l_returnflag_arr, l_linestatus_arr, l_shipdate_arr, l_commitdate_arr, l_receiptdate_arr, l_shipinstruct_arr, l_shipmode_arr, l_comment_arr};
+  std::vector<std::shared_ptr<arrow::Array>> output_arrs = {l_quantity_arr};
+  auto recordbatch = arrow::RecordBatch::Make(schema, num_val, output_arrs);
+  return recordbatch;
+}
+
+std::shared_ptr<arrow::RecordBatch> prepareRecordBatchC2(int32_t num_val)
+{
+  std::shared_ptr<arrow::Buffer> values;
+  uint64_t *values_ptr = nullptr;
+  const size_t values_size = sizeof(int64_t) * num_val;
+  int retval = posix_memalign(reinterpret_cast<void **>(&values_ptr), 4096, values_size);
+  if (retval)
+  {
+    printf("Error %d allocating aligned memory for output\n", retval);
+  }
+  memset(values_ptr, 0, values_size);
+  values = arrow::MutableBuffer::Wrap(values_ptr, num_val); //Wrap uses the sizeof of the template of the pointer
+  if (values->is_mutable())
+  {
+    printf("Buffer is mutable\n");
+  }
+  else
+  {
+    printf("Buffer is NOT mutable\n");
+  }
+  printf("allocated memory address 0x%p, size %d. arrow buffer mutable data address 0x%p, size %d\n", values_ptr, values_size, values->mutable_data(), values->size());
+
+  std::shared_ptr<arrow::Schema> schema = arrow::schema({arrow::field("l_extendedprice", arrow::float64(), false)});
+
+  auto l_extendedprice_arr = std::make_shared<arrow::DoubleArray>(num_val, values);
+
+  // Final recordbatch
+  //std::vector<std::shared_ptr<arrow::Array>> output_arrs = {l_orderkey_arr, l_partkey_arr, l_suppkey_arr, l_linenumber_arr, l_quantity_arr, l_extendedprice_arr, l_discount_arr, l_tax_arr, l_returnflag_arr, l_linestatus_arr, l_shipdate_arr, l_commitdate_arr, l_receiptdate_arr, l_shipinstruct_arr, l_shipmode_arr, l_comment_arr};
+  std::vector<std::shared_ptr<arrow::Array>> output_arrs = {l_extendedprice_arr};
+  auto recordbatch = arrow::RecordBatch::Make(schema, num_val, output_arrs);
+  return recordbatch;
+}
+
+std::shared_ptr<arrow::RecordBatch> prepareRecordBatchC3(int32_t num_val)
+{
+  std::shared_ptr<arrow::Buffer> values;
+  uint64_t *values_ptr = nullptr;
+  const size_t values_size = sizeof(int64_t) * num_val;
+  int retval = posix_memalign(reinterpret_cast<void **>(&values_ptr), 4096, values_size);
+  if (retval)
+  {
+    printf("Error %d allocating aligned memory for output\n", retval);
+  }
+  memset(values_ptr, 0, values_size);
+  values = arrow::MutableBuffer::Wrap(values_ptr, num_val); //Wrap uses the sizeof of the template of the pointer
+  if (values->is_mutable())
+  {
+    printf("Buffer is mutable\n");
+  }
+  else
+  {
+    printf("Buffer is NOT mutable\n");
+  }
+  printf("allocated memory address 0x%p, size %d. arrow buffer mutable data address 0x%p, size %d\n", values_ptr, values_size, values->mutable_data(), values->size());
+
+  std::shared_ptr<arrow::Schema> schema = arrow::schema({arrow::field("l_discount", arrow::float64(), false)});
+
+  auto l_discount_arr = std::make_shared<arrow::DoubleArray>(num_val, values);
+
+  // Final recordbatch
+  //std::vector<std::shared_ptr<arrow::Array>> output_arrs = {l_orderkey_arr, l_partkey_arr, l_suppkey_arr, l_linenumber_arr, l_quantity_arr, l_extendedprice_arr, l_discount_arr, l_tax_arr, l_returnflag_arr, l_linestatus_arr, l_shipdate_arr, l_commitdate_arr, l_receiptdate_arr, l_shipinstruct_arr, l_shipmode_arr, l_comment_arr};
+  std::vector<std::shared_ptr<arrow::Array>> output_arrs = {l_discount_arr};
+  auto recordbatch = arrow::RecordBatch::Make(schema, num_val, output_arrs);
+  return recordbatch;
+}
+
+std::shared_ptr<arrow::RecordBatch> prepareRecordBatchC4(int32_t num_val)
+{
+  std::shared_ptr<arrow::Buffer> values;
+  uint64_t *values_ptr = nullptr;
+  const size_t values_size = sizeof(int32_t) * num_val;
+  int retval = posix_memalign(reinterpret_cast<void **>(&values_ptr), 4096, values_size);
+  if (retval)
+  {
+    printf("Error %d allocating aligned memory for output\n", retval);
+  }
+  memset(values_ptr, 0, values_size);
+  values = arrow::MutableBuffer::Wrap(values_ptr, num_val); //Wrap uses the sizeof of the template of the pointer
+  if (values->is_mutable())
+  {
+    printf("Buffer is mutable\n");
+  }
+  else
+  {
+    printf("Buffer is NOT mutable\n");
+  }
+  printf("allocated memory address 0x%p, size %d. arrow buffer mutable data address 0x%p, size %d\n", values_ptr, values_size, values->mutable_data(), values->size());
+
+  std::shared_ptr<arrow::Schema> schema = arrow::schema({arrow::field("l_shipdate", arrow::date32(), false)});
+
+  auto l_shipdate_arr = std::make_shared<arrow::Date32Array>(num_val, values);
+
+  // Final recordbatch
+  //std::vector<std::shared_ptr<arrow::Array>> output_arrs = {l_orderkey_arr, l_partkey_arr, l_suppkey_arr, l_linenumber_arr, l_quantity_arr, l_extendedprice_arr, l_discount_arr, l_tax_arr, l_returnflag_arr, l_linestatus_arr, l_shipdate_arr, l_commitdate_arr, l_receiptdate_arr, l_shipinstruct_arr, l_shipmode_arr, l_comment_arr};
+  std::vector<std::shared_ptr<arrow::Array>> output_arrs = {l_shipdate_arr};
+  auto recordbatch = arrow::RecordBatch::Make(schema, num_val, output_arrs);
+  return recordbatch;
+}
+
+//void setPtoaArguments(uint64_t col_base_offset, std::shared_ptr<fletcher::Platform> platform, uint32_t num_val,
+//                      uint64_t max_size, da_t device_parquet_address)
+void setPtoaArguments(uint64_t col_base_offset, std::shared_ptr<fletcher::Platform> platform, PtoaRegs p)
+{
+  dau_t mmio64_writer;
+
+  platform->WriteMMIO(col_base_offset, REG_BASE + 0, p.num_val);
+
+  mmio64_writer.full = (da_t)p.device_parquet_address;
+  platform->WriteMMIO(col_base_offset, REG_BASE + 1, mmio64_writer.lo);
+  platform->WriteMMIO(col_base_offset, REG_BASE + 2, mmio64_writer.hi);
+
+  mmio64_writer.full = p.max_size;
+  platform->WriteMMIO(col_base_offset, REG_BASE + 3, mmio64_writer.lo);
+  platform->WriteMMIO(col_base_offset, REG_BASE + 4, mmio64_writer.hi);
+
+  return;
+}
+
+//Use standard Arrow library functions to read Arrow array from Parquet file
+//Only works for Parquet version 1 style files.
+std::vector<std::shared_ptr<arrow::ChunkedArray>> returnColumnarChunks(std::string hw_input_file_path)
+{
+  std::shared_ptr<arrow::io::ReadableFile> infile;
+  arrow::Result<std::shared_ptr<arrow::io::ReadableFile>> result = arrow::io::ReadableFile::Open(hw_input_file_path);
+  if (result.ok())
+  {
+    infile = result.ValueOrDie();
+  }
+  else
+  {
+    printf("Error opening Parquet file: code %d, error message: %s\n",
+           result.status().code(), result.status().message().c_str());
+    exit(-1);
+  }
+
+  std::unique_ptr<parquet::arrow::FileReader> reader;
+  parquet::arrow::OpenFile(infile, arrow::default_memory_pool(), &reader);
+
+  std::shared_ptr<arrow::ChunkedArray> array;
+  std::vector<std::shared_ptr<arrow::ChunkedArray>> arrays;
+  for (int i = 0; i < 4; ++i)
+  {
+    reader->ReadColumn(i, &array);
+    arrays.push_back(array);
+  }
+
+  return arrays;
+}
+
+int main(int argc, char **argv)
+{
+  fletcher::Status status;
+  std::shared_ptr<fletcher::Platform> platform;
+  std::vector<std::shared_ptr<fletcher::Context>> contexts;
+  std::vector<fletcher::Kernel> kernels;
+  fletcher::Timer t;
+  std::vector<uint64_t> base_offsets;
+  base_offsets.push_back(calculate_reg_base_offset(0));
+  base_offsets.push_back(calculate_reg_base_offset(1));
+  base_offsets.push_back(calculate_reg_base_offset(2));
+  base_offsets.push_back(calculate_reg_base_offset(3));
+  // We map predicate instance to final offset
+  base_offsets.push_back(calculate_reg_base_offset(4));
+
+  char *hw_input_file_path;
+  char *reference_parquet_file_path;
+  uint32_t num_val;
+  uint64_t file_size;
+  uint8_t *file_data, file_data_c1, file_data_c2, file_data_c3;
+
+  if (argc > 3)
+  {
+    hw_input_file_path = argv[1];
+    reference_parquet_file_path = argv[2];
+    num_val = (uint32_t)std::strtoul(argv[3], nullptr, 10);
+  }
+  else
+  {
+    std::cerr << "Usage: prim64 <parquet_hw_input_file_path> <reference_parquet_file_path> <num_values>" << std::endl;
+    return 1;
+  }
+
+  status = fletcher::Platform::Make("snap", &platform, false);
+  if (!status.ok())
+  {
+    std::cerr << "Could not create Fletcher platform." << std::endl;
+    return -1;
+  }
+  platform->Init();
+
+  /*************************************************************
+  * Parquet file reading
+  *************************************************************/
+  tpch::FileReader fileReader(hw_input_file_path);
+  std::vector<PtoaRegs> regs = fileReader.getFirstChunkOffset();
+
+  /*************************************************************
+  * FPGA RecordBatch preparation
+  *************************************************************/
+
+  t.start();
+  std::vector<std::shared_ptr<arrow::RecordBatch>> out_batches;
+  out_batches.push_back(prepareRecordBatchC1(num_val * 4));
+  out_batches.push_back(prepareRecordBatchC2(num_val * 4));
+  out_batches.push_back(prepareRecordBatchC3(num_val * 4));
+  out_batches.push_back(prepareRecordBatchC4(num_val * 4));
+  out_batches.push_back(prepareFinalRecordBatch(200));
+  t.stop();
+  std::cout << "Prepare FPGA RecordBatch         : "
+            << t.seconds() << std::endl;
+
+  //auto res_l_orderkey_array = std::dynamic_pointer_cast<arrow::Int64Array>(arrow_rb_fpga->column(0));
+  //auto res_l_orderkey_data = res_l_orderkey_array->values()->mutable_data();
+
+  //auto res_l_partkey_array = std::dynamic_pointer_cast<arrow::Int64Array>(arrow_rb_fpga->column(1));      else if( i == 1 )
+  //setPtoaArguments(o, platform, num_val, file_size, (da_t) file_data);
+  //auto res_l_partkey_data = res_l_partkey_array->values()->mutable_data();
+
+  //auto res_l_suppkey_array = std::dynamic_pointer_cast<arrow::Int64Array>(arrow_rb_fpga->column(2));
+  //auto res_l_suppkey_data = res_l_suppkey_array->values()->mutable_data();
+
+  //auto res_l_linenumber_array = std::dynamic_pointer_cast<arrow::Int64Array>(arrow_rb_fpga->column(3));
+  //auto res_l_linenumber_data = res_l_linenumber_array->values()->mutable_data();
+
+  //auto res_l_quantity_array = std::dynamic_pointer_cast<arrow::DoubleArray>(arrow_rb_fpga->column(4));
+  //auto res_l_quantity_data = res_l_quantity_array->values()->mutable_data();
+
+  //auto res_l_extendedprice_array = std::dynamic_pointer_cast<arrow::DoubleArray>(arrow_rb_fpga->column(5));
+  //auto res_l_extendedprice_data = res_l_extendedprice_array->values()->mutable_data();
+
+  //auto res_l_discount_array = std::dynamic_pointer_cast<arrow::DoubleArray>(arrow_rb_fpga->column(6));
+  //auto res_l_discount_data = res_l_discount_array->values()->mutable_data();
+
+  //auto res_l_tax_array = std::dynamic_pointer_cast<arrow::DoubleArray>(arrow_rb_fpga->column(7));
+  //auto res_l_tax_data = res_l_tax_array->values()->mutable_data();
+
+  //auto res_l_returnflag_array = std::dynamic_pointer_cast<arrow::StringArray>(arrow_rb_fpga->column(8));
+  //auto res_l_returnflag_off = res_l_returnflag_array->value_offsets()->mutable_data();
+  //auto res_l_returnflag_val = res_l_returnflag_array->value_data()->mutable_data();
+
+  //auto res_l_linestatus_array = std::dynamic_pointer_cast<arrow::StringArray>(arrow_rb_fpga->column(9));
+  //auto res_l_linestatus_off = res_l_linestatus_array->value_offsets()->mutable_data();
+  //auto res_l_linestatus_val = res_l_linestatus_array->value_data()->mutable_data();
+
+  //auto res_l_shipdate_array = std::dynamic_pointer_cast<arrow::Date32Array>(arrow_rb_fpga->column(10));
+  //auto res_l_shipdate_data = res_l_shipdate_array->values()->mutable_data();
+
+  //auto res_l_commitdate_array = std::dynamic_pointer_cast<arrow::Date32Array>(arrow_rb_fpga->column(11));
+  //auto res_l_commitdate_data = res_l_commitdate_array->values()->mutable_data();
+
+  //auto res_l_receiptdate_array = std::dynamic_pointer_cast<arrow::Date32Array>(arrow_rb_fpga->column(12));
+  //auto res_l_receiptdate_data = res_l_receiptdate_array->values()->mutable_data();
+
+  //auto res_l_shipinstruct_array = std::dynamic_pointer_cast<arrow::StringArray>(arrow_rb_fpga->column(13));
+  //auto res_l_shipinstruct_off = res_l_shipinstruct_array->value_offsets()->mutable_data();
+  //auto res_l_shipinstruct_val = res_l_shipinstruct_array->value_data()->mutable_data();
+
+  //auto res_l_shipmode_array = std::dynamic_pointer_cast<arrow::StringArray>(arrow_rb_fpga->column(14));
+  //auto res_l_shipmode_off = res_l_shipmode_array->value_offsets()->mutable_data();
+  //auto res_l_shipmode_val = res_l_shipmode_array->value_data()->mutable_data();
+
+  //auto res_l_comment_array = std::dynamic_pointer_cast<arrow::StringArray>(arrow_rb_fpga->column(15));
+  //auto res_l_comment_off = res_l_comment_array->value_offsets()->mutable_data();
+  //auto res_l_comment_val = res_l_comment_array->value_data()->mutable_data();
+
+  t.start();
+
+  for (int c = 0; c < 4; c++)
+  {
+    checkMMIO(base_offsets[c], platform, num_val); //give the snappy decompressor some time to clear valid bits
+  }
+
+  auto res_l_extendedprice_array = std::dynamic_pointer_cast<arrow::DoubleArray>(out_batches[0]->column(0));
+  auto res_l_extendedprice_data = res_l_extendedprice_array->values()->mutable_data();
+
+  auto res_l_discount_array = std::dynamic_pointer_cast<arrow::DoubleArray>(out_batches[1]->column(0));
+  auto res_l_discount_data = res_l_discount_array->values()->mutable_data();
+
+  auto res_l_quantity_array = std::dynamic_pointer_cast<arrow::DoubleArray>(out_batches[2]->column(0));
+  auto res_l_quantity_data = res_l_quantity_array->values()->mutable_data();
+
+  auto res_l_shipdate_array = std::dynamic_pointer_cast<arrow::Date32Array>(out_batches[3]->column(0));
+  auto res_l_shipdate_data = res_l_shipdate_array->values()->mutable_data();
+
+  auto result_buffer_size = res_l_extendedprice_array->values()->size();
+  //printf("result_buffer_raw_data address 0x%p, size %d\n", result_buffer_raw_data, result_buffer_size);
+
+  /*************************************************************
+  * FPGA Initilialization
+  *************************************************************/
+
+  //Create context and kernel
+  for (int i = 0; i < NUM_COLS + 1; ++i)
+  {
+    std::shared_ptr<fletcher::Context> context;
+    fletcher::Context::Make(&context, platform);
+    context->fletcher_snap_action_reg_offset = base_offsets[i];
+    fletcher::Kernel kernel(context);
+    std::cout << "context no: " << i << "\n";
+    std::cout << out_batches[i]->ToString() << "\n";
+    context->QueueRecordBatch(out_batches[i]);
+    //if (i == NUM_COLS)
+    //{
+    //  context->QueueRecordBatch(out_batches[i]);
+    //}
+    context->Enable();
+    // Push back
+    kernel.Reset();
+    contexts.push_back(context);
+    kernels.push_back(kernel);
+  }
+
+  //Malloc parquet file on device
+  da_t device_parquet_address;
+  if (strcmp("oc-accel", platform->name().c_str()) == 0 || strcmp("snap", platform->name().c_str()) == 0)
+  {
+    printf("Platform [%s]: Skipping device buffer allocation and host to device copy.\n",
+           platform->name().c_str());
+    // Set all the MMIO registers to their correct value
+    int i = 0;
+    for (auto &o : base_offsets)
+    {
+      if (i < 4)
+        setPtoaArguments(o, platform, regs[i]);
+      ++i;
+    }
+  }
+  else
+  {
+    std::cout << "No other platforms are supported.\n";
+    //platform->DeviceMalloc(&device_parquet_address, file_size);
+
+    //// Set all the MMIO registers to their correct value
+    //for (int i = 0; i < NUM_COLS; ++i)
+    //  setPtoaArguments(i, platform, num_val, file_size, (da_t)(file_data));
+  }
+  t.stop();
+  std::cout << "FPGA Initialize                  : "
+            << t.seconds() << std::endl;
+  //checkMMIO(platform, num_val);
+
+  // Make sure all buffer memory is allocated
+  //memset(result_buffer_raw_data, 0, result_buffer_size);
+
+  /*************************************************************
+  * FPGA host to device copy
+  *************************************************************/
+
+  t.start();
+  //platform->CopyHostToDevice(file_data, device_parquet_address, file_size);
+  t.stop();
+  std::cout << "FPGA host to device copy         : "
+            << t.seconds() << std::endl;
+
+  /*************************************************************
+  * FPGA processing
+  *************************************************************/
+  t.start();
+  // Spawn threads
+  //std::vector<std::thread> thread_vector;
+  // We start predicate/projection instance at first
+  for (int i = NUM_COLS; i >= 0; --i)
+  {
+    kernels[i].Start();
+    //std::thread th(runColumn, i, kernels[i]);
+    //thread_vector.push_back(std::move(th));
+  }
+
+  // Wait for only predicate instance
+  kernels[NUM_COLS].WaitForFinish(10);
+
+  //for (auto &th : thread_vector)
+  //{
+  //  if (th.joinable())
+  //    th.join();
+  //}
+
+  std::cout << "FPGA processing time             : "
+            << t.seconds() << std::endl;
+
+  /*************************************************************
+  * FPGA device to host copy
+  *************************************************************/
+
+  std::cout << "Copying the result...\n"
+            << std::endl;
+  t.start();
+  //platform->CopyDeviceToHost(context->device_buffer(0).device_address,
+  //                           res_l_orderkey_data,
+  //                           sizeof(int64_t) * (num_val));
+  //platform->CopyDeviceToHost(context->device_buffer(1).device_address,
+  //                           res_l_partkey_data,
+  //                           sizeof(int64_t) * (num_val));
+  //platform->CopyDeviceToHost(context->device_buffer(2).device_address,
+  //                           res_l_suppkey_data,
+  //                           sizeof(int64_t) * (num_val));
+  //platform->CopyDeviceToHost(context->device_buffer(3).device_address,
+  //                           res_l_linenumber_data,
+  //                           sizeof(int64_t) * (num_val));
+  //platform->CopyDeviceToHost(context->device_buffer(4).device_address,
+  //                           res_l_quantity_data,
+  //                           sizeof(int64_t) * (num_val));
+  //platform->CopyDeviceToHost(context->device_buffer(5).device_address,
+  //                           res_l_extendedprice_data,
+  //                           sizeof(int64_t) * (num_val));
+  //platform->CopyDeviceToHost(context->device_buffer(6).device_address,
+  //                           res_l_discount_data,
+  //                           sizeof(int64_t) * (num_val));
+  //platform->CopyDeviceToHost(context->device_buffer(7).device_address,
+  //                           res_l_tax_data,
+  //                           sizeof(int64_t) * (num_val));
+  //platform->CopyDeviceToHost(context->device_buffer(8).device_address,
+  //                           res_l_returnflag_off,
+  //                           sizeof(int32_t) * (num_val + 1));
+  //platform->CopyDeviceToHost(context->device_buffer(9).device_address,
+  //                           res_l_returnflag_val,
+  //                           sizeof(int64_t));
+  //platform->CopyDeviceToHost(context->device_buffer(10).device_address,
+  //                           res_l_linestatus_off,
+  //                           sizeof(int32_t) * (num_val + 1));
+  //platform->CopyDeviceToHost(context->device_buffer(11).device_address,
+  //                           res_l_linestatus_val,
+  //                           sizeof(int64_t));
+  //platform->CopyDeviceToHost(context->device_buffer(12).device_address,
+  //                           res_l_shipdate_data,
+  //                           sizeof(int32_t) * (num_val));
+  //platform->CopyDeviceToHost(context->device_buffer(13).device_address,
+  //                           res_l_commitdate_data,
+  //                           sizeof(int32_t) * (num_val));
+  //platform->CopyDeviceToHost(context->device_buffer(14).device_address,
+  //                           res_l_receiptdate_data,
+  //                           sizeof(int32_t) * (num_val));
+  //platform->CopyDeviceToHost(context->device_buffer(15).device_address,
+  //                           res_l_shipinstruct_off,
+  //                           sizeof(int32_t) * (num_val + 1));
+  //platform->CopyDeviceToHost(context->device_buffer(16).device_address,
+  //                           res_l_shipinstruct_val,
+  //                           sizeof(int64_t) * 25);
+  //platform->CopyDeviceToHost(context->device_buffer(17).device_address,
+  //                           res_l_shipmode_off,
+  //                           sizeof(int32_t) * (num_val + 1));
+  //platform->CopyDeviceToHost(context->device_buffer(18).device_address,
+  //                           res_l_shipmode_val,
+  //                           sizeof(int64_t) * 10);
+  //platform->CopyDeviceToHost(context->device_buffer(19).device_address,
+  //                           res_l_comment_off,
+  //                           sizeof(int64_t) * (num_val + 1));
+  //platform->CopyDeviceToHost(context->device_buffer(20).device_address,
+  //                           res_l_comment_val,
+  //                           sizeof(int64_t) * 44);
+
+  //platform->CopyDeviceToHost(contexts[0]->device_buffer(0).device_address,
+  //                           res_l_extendedprice_data,
+  //                           sizeof(int64_t) * (num_val));
+  //platform->CopyDeviceToHost(contexts[1]->device_buffer(0).device_address,
+  //                           res_l_discount_data,
+  //                           sizeof(int64_t) * (num_val));
+  //platform->CopyDeviceToHost(contexts[2]->device_buffer(0).device_address,
+  //                           res_l_quantity_data,
+  //                           sizeof(int64_t) * (num_val));
+  //platform->CopyDeviceToHost(contexts[3]->device_buffer(0).device_address,
+  //                           res_l_shipdate_data,
+  //                           sizeof(int32_t) * (num_val));
+  double revenue = tpch::get_query_result(contexts[NUM_COLS]);
+  //uint32_t return_value_0, return_value_1;
+  //status = kernels[4].GetReturn(&return_value_0, &return_value_1);
+  //int64_t result = return_value_1;
+  //result = (result << 32) | return_value_0;
+  //double revenue = tpch::fixed_to_float(result);
+  t.stop();
+  std::cout << "Result is " << revenue << std::endl;
+
+  size_t total_arrow_size = sizeof(int64_t) * num_val;
+
+  std::cout << "FPGA device to host copy         : "
+            << t.seconds() << std::endl;
+  std::cout << "Arrow buffers total size         : "
+            << total_arrow_size << std::endl;
+
+  /*************************************************************
+  * Check results
+  *************************************************************/
+
+  //std::free(file_data);
+
+  return 0;
+}
