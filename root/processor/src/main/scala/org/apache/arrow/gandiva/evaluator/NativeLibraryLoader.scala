@@ -11,7 +11,7 @@ object NativeLibraryLoader {
       .getInstance() //needs to load gandiva libraries first to avoid conflicts (only package visible)
     System.setProperty(
       "java.library.path",
-      "/shares/bulk/yyonsel/snap-build/parquet-decoder-runtime/tpc-spark-fletcher/arrow-processor-native/build/lib/main/debug:/home/yyonsel/bulk/project/local/lib:/home/yyonsel/bulk/project/local/lib64:/usr/local/lib64:/usr/local/lib"
+      "/home/yyonsel/bulk/snap-build/maven-repo/root/native/target:/home/yyonsel/bulk/project/local/lib:/home/yyonsel/bulk/project/local/lib64:/usr/local/lib64:/usr/local/lib"
     )
     //System.setProperty("java.library.path", "/home/yyonsel/bulk/project/local/lib:/home/yyonsel/bulk/project/local/lib64:/usr/local/lib64:/usr/local/lib")
     val libpath = System.getProperty("java.library.path")
@@ -23,7 +23,7 @@ object NativeLibraryLoader {
     System.loadLibrary("ocxl")
     System.loadLibrary("fletcher_snap")
     System.loadLibrary("fletcher")
-    System.loadLibrary("arrow-processor-native")
+    System.loadLibrary("native")
     true
   }
 }

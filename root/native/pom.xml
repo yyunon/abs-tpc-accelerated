@@ -51,18 +51,19 @@
                         <source>
                             <directory>${basedir}/src/main/cpp</directory>
                             <fileNames>
+                                <!--
                                 <fileName>Macro.h</fileName>
                                 <fileName>Tpch.h</fileName>
                                 <fileName>Util.h</fileName>
-                                <fileName>DataSetParquetReader.h</fileName>
-                                <fileName>DataSetParquetReader.cpp</fileName>
-                                <fileName>PlatfomWrapper.h</fileName>
-                                <fileName>PlatfomWrapper.cpp</fileName>
-                                <fileName>ColumnScheduler.h</fileName>
-                                <fileName>ColumnScheduler.cpp</fileName>
                                 <fileName>FileReader.h</fileName>
-                                <fileName>FileReader.cpp</fileName>
+                                <fileName>ColumnScheduler.h</fileName>
+                                <fileName>PlatformWrapper.h</fileName>
+                                <fileName>DataSetParquetReader.h</fileName>
                                 <fileName>FletcherParquetReader.h</fileName>
+                                -->
+                                <fileName>DataSetParquetReader.cpp</fileName>
+                                <fileName>PlatformWrapper.cpp</fileName>
+                                <fileName>FileReader.cpp</fileName>
                                 <fileName>FletcherParquetReader.cpp</fileName>
                                 <fileName>JNIFletcherParquetReader.cpp</fileName>
                             </fileNames>
@@ -73,14 +74,16 @@
                         <source>
                             <directory>${basedir}/src/main/cpp/jni</directory>
                             <fileNames>
+                              <!--
                               <fileName>Assertions.h</fileName>
                               <fileName>Converters.h</fileName>
-                              <fileName>Converters.cpp</fileName>
                               <fileName>JavaMemoryPool.h</fileName>
-                              <fileName>JavaMemoryPool.cpp</fileName>
                               <fileName>JavaResizableBuffer.h</fileName>
-                              <fileName>JavaResizableBuffer.cpp</fileName>
                               <fileName>ProtobufSchemaDeserializer.h</fileName>
+                              -->
+                              <fileName>Converters.cpp</fileName>
+                              <fileName>JavaMemoryPool.cpp</fileName>
+                              <fileName>JavaResizableBuffer.cpp</fileName>
                               <fileName>ProtobufSchemaDeserializer.cpp</fileName>
                               <fileName>JNILoader.cpp</fileName>
                             </fileNames>
@@ -92,16 +95,22 @@
                     <compilerStartOptions>
                         <compilerStartOption>-I ${JAVA_HOME}/include/</compilerStartOption>
                         <compilerStartOption>-I ${JAVA_HOME}/include/linux/</compilerStartOption>
-                        <compilerStartOption>-I ${WORK}/local/include/</compilerStartOption>
+                        <compilerStartOption>-I /usr/include/</compilerStartOption>
+                        <compilerStartOption>-I ${env.WORK}/local/include/</compilerStartOption>
                     </compilerStartOptions>
                     <compilerEndOptions>
-                        <compilerEndOption>-fPIC</compilerEndOption>
                         <compilerEndOption>-std=gnu++17</compilerEndOption>
                     </compilerEndOptions>
                     <linkerStartOptions>
+                        <linkerStartOption>-shared</linkerStartOption>
                         <linkerStartOption>-I ${JAVA_HOME}/include/</linkerStartOption>
                         <linkerStartOption>-I ${JAVA_HOME}/include/linux/</linkerStartOption>
                         <linkerStartOption>-I ${JAVA_HOME}/lib/</linkerStartOption>
+                        <linkerStartOption>-I /usr/include/</linkerStartOption>
+                        <linkerStartOption>-L /usr/lib/</linkerStartOption>
+                        <linkerStartOption>-L /usr/lib64/</linkerStartOption>
+                        <linkerStartOption>-L ${env.WORK}/local/lib/</linkerStartOption>
+                        <linkerStartOption>-L ${env.WORK}/local/lib64/</linkerStartOption>
                     </linkerStartOptions>
                     <linkerEndOptions>
                         <linkerEndOption>-shared</linkerEndOption>
@@ -113,7 +122,7 @@
                         <linkerEndOption>-lfletcher</linkerEndOption>
                         <linkerEndOption>-lfletcher_snap</linkerEndOption>
                         <linkerEndOption>-lparquet</linkerEndOption>
-                        <linkerEndOption>-o ${project.build.directory}/${name}</linkerEndOption>
+                        <linkerEndOption>-o ${project.build.directory}/lib${name}.so</linkerEndOption>
                     </linkerEndOptions>
                 </configuration>
                 <executions>
