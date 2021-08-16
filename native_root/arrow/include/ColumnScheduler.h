@@ -281,7 +281,7 @@ namespace tpc
 	{
 
 		internal::PlatformWrapper p_w;
-		inline double RunInstanceProjection(std::vector<PtoaRegs> regs)
+		inline double RunInstanceProjection(PtoaRegs* regs)
 		{
 			//printf("[THREAD NO %d]: Task running...\n", instance_index);
 			double result = p_w.call([&](std::shared_ptr<fletcher::Platform> &platform_g)
@@ -346,7 +346,7 @@ namespace tpc
 		};
 
 		double Schedule(const std::vector<std::vector<PtoaRegs>>& chunks);
-		fletcher::Status Submit(const std::vector<std::vector<PtoaRegs>>& chunks);
+		fletcher::Status Submit(PtoaRegs** chunks);
 		bool future_is_ready(std::future<double> const &f);
 		bool hasNext();
 		double Next();

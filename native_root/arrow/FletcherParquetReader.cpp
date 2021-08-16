@@ -25,7 +25,13 @@ namespace tpc
     auto t_meta_start = std::chrono::high_resolution_clock::now();
     std::shared_ptr<FileReader> metadataParser = FileReader::Make(file_name, std::move(schema_out), true);
     //auto regs = metadataParser->offsetsPreloaded1SF();
-    std::vector<std::vector<PtoaRegs>> regs = metadataParser->readChunks();
+    PtoaRegs ** regs = new PtoaRegs*[metadataParser->num_row_groups];
+    for(int i = 0; i < metadataParser->num_row_groups; ++i)
+      regs[i] = new PtoaRegs[4];
+    
+    std::cout << "Regs initialized... \n";
+    ASSERT_FLETCHER_OK(metadataParser->readChunks(regs));
+    //std::vector<std::vector<PtoaRegs>> regs = metadataParser->readChunks();
     //column_scheduler = std::atomic_load(&(platform_w->column_scheduler));
     auto t_meta_end = std::chrono::high_resolution_clock::now();
 
@@ -34,6 +40,10 @@ namespace tpc
     std::cout << "Scheduling... \n";
     auto t_meta = std::chrono::duration_cast<std::chrono::microseconds>(t_meta_end - t_meta_start).count();
     std::cout << "Native runtime : \t" << t_meta << "us" << std::endl;
+
+    for(int i = 0; i <4; ++i)
+      delete[] regs[i];
+    delete[] regs; 
   }
   
   double FletcherParquetReader::Next(PlatformWrapper* platform_w)

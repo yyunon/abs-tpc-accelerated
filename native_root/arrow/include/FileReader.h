@@ -23,7 +23,10 @@ namespace tpc
 		uint8_t *read_file(int offset, size_t size, size_t buffer_size);
 		void parseRegs(PtoaRegs *chunk, std::unique_ptr<parquet::ColumnChunkMetaData> chunk_meta);
 		std::vector<std::vector<PtoaRegs>> readChunks();
+                fletcher::Status readChunks(PtoaRegs** chunks_r);
 		uint8_t *returnFileData();
+
+		int num_row_groups;
 
 	protected:
 		std::ifstream pq_file;
@@ -38,7 +41,6 @@ namespace tpc
 		std::vector<int64_t> rowGroupByteSizes;
 		bool load_file = false;
 		int num_columns;
-		int num_row_groups;
 		size_t file_size;
 	};
 }

@@ -12,7 +12,7 @@ namespace tpc
 			for (int i = 0; i < chunks.size(); ++i)
 			{
 				//printf("[TASK NO] Reg is : %lu\n", (uint64_t) chunks[i][0].device_parquet_address);
-				futures[i] = pool.submit(std::bind(&ColumnScheduler::RunInstanceProjection, this, std::move(chunks[i])));
+				//futures[i] = pool.submit(std::bind(&ColumnScheduler::RunInstanceProjection, this, std::move(chunks[i])));
 			}
 			for (int i = 0; i < chunks.size(); ++i)
 			{
@@ -20,15 +20,17 @@ namespace tpc
 			}
 			return result;
                 }
-		fletcher::Status ColumnScheduler::Submit(const std::vector<std::vector<PtoaRegs>>& chunks)
+		fletcher::Status ColumnScheduler::Submit(PtoaRegs** chunks)
 		{
-			std::vector<std::future<double>> futures(chunks.size());
+                        int chunks_size = sizeof(chunks) / sizeof(chunks[0]);
+			std::vector<std::future<double>> futures(chunks_size);
 			//futures.resize(chunks.size());
-			//printf("[THREADS DEBUG]: %d number of tasks will be submitted\n", chunks.size());
-			for (int i = 0; i < chunks.size(); ++i)
-			{
+			printf("[THREADS DEBUG]: %d number of tasks will be submitted\n", chunks_size);
+			for (int i = 0; i < chunks_size; ++i)
+			{       
+                                PtoaRegs* chunks_to_send = chunks[i];
 				//printf("[TASK NO] Reg is : %lu\n", (uint64_t) chunks[i][0].device_parquet_address);
-				futures[i] = pool.submit(std::bind(&ColumnScheduler::RunInstanceProjection, this, std::move(chunks[i])));
+				futures[i] = pool.submit(std::bind(&ColumnScheduler::RunInstanceProjection, this, chunks_to_send));
 			}
                         for(auto & f: futures)
                         {

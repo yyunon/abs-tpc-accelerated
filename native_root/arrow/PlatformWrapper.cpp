@@ -21,7 +21,7 @@ namespace tpc
     //column_scheduler = new ColumnScheduler(platform);
   }
   
-  fletcher::Status PlatformWrapper::Submit(std::vector<std::vector<PtoaRegs>> regs)
+  fletcher::Status PlatformWrapper::Submit(PtoaRegs** regs)
   {
     ASSERT_FLETCHER_OK(column_scheduler->Submit(regs));
     return fletcher::Status::OK();

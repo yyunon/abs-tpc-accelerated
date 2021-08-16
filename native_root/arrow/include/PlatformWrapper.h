@@ -22,7 +22,7 @@ namespace tpc
         std::shared_ptr<fletcher::Platform> platform;
     public:
         PlatformWrapper();
-        fletcher::Status Submit(std::vector<std::vector<PtoaRegs>> regs);
+        fletcher::Status Submit(PtoaRegs** regs);
         double Next();
         bool hasNext(); 
         //PlatformWrapper (const PlatformWrapper&) = delete;
