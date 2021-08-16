@@ -17,7 +17,7 @@ namespace tpc
     class PlatformWrapper
     {
     private:
-        std::unique_ptr<ColumnScheduler> column_scheduler;
+        std::shared_ptr<ColumnScheduler> column_scheduler;
         //ColumnScheduler* column_scheduler;
         std::shared_ptr<fletcher::Platform> platform;
     public:
@@ -27,7 +27,11 @@ namespace tpc
         bool hasNext(); 
         //PlatformWrapper (const PlatformWrapper&) = delete;
         //PlatformWrapper& operator= (const PlatformWrapper&) = delete;
-        ~PlatformWrapper() = default;
+        ~PlatformWrapper()
+        {
+          std::cout << "Destructing scheduler instance\n";
+          //delete column_scheduler;
+        }
     };
 
 }

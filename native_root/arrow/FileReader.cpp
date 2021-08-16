@@ -76,7 +76,7 @@ namespace tpc
   std::vector<std::vector<PtoaRegs>> FileReader::readChunks()
   {
           int64_t row_group_size;
-          std::vector<std::vector<PtoaRegs>> chunks_r;
+          std::vector<std::vector<PtoaRegs>> chunks_r(num_row_groups);
           //Select columns
           std::vector<std::string> selected_cols = input_schema->field_names();
           std::vector<int> selected_indexes;
@@ -89,7 +89,7 @@ namespace tpc
           int x = 0;
           for (auto &r : rowGroupMetadata)
           {
-                  //printf("[METADATA_PARSER DEBUG] Reading row group no %d\n", x++);
+                  printf("[METADATA_PARSER DEBUG] Reading row group no %d\n", x++);
                   std::vector<PtoaRegs> chunks;
                   for (auto &i : selected_indexes)
                   {
@@ -99,7 +99,7 @@ namespace tpc
                   }
                   chunks_r.push_back(chunks);
           }
-          //printf("[METADATA_PARSER DEBUG] Reading done\n");
+          printf("[METADATA_PARSER DEBUG] Reading done\n");
           return chunks_r;
   }
   uint8_t *FileReader::returnFileData()

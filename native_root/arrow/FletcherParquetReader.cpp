@@ -30,8 +30,8 @@ namespace tpc
     auto t_meta_end = std::chrono::high_resolution_clock::now();
 
     // As soon as you create column scheduler, you submit the task
-    std::cout << "Scheduling... \n";
     ASSERT_FLETCHER_OK(platform_w->Submit(regs));
+    std::cout << "Scheduling... \n";
     auto t_meta = std::chrono::duration_cast<std::chrono::microseconds>(t_meta_end - t_meta_start).count();
     std::cout << "Native runtime : \t" << t_meta << "us" << std::endl;
   }

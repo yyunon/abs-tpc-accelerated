@@ -12,11 +12,6 @@ namespace tpc
 	extern __thread uint32_t instance_index;
 	namespace internal
 	{
-                template<typename T, typename... Args>
-                std::unique_ptr<T> make_unique(Args&&... args)
-                {
-                  return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
-                }
 		//class FunctionWrapper;
 		//class JoinThreads;
 		//class WorkStealingTaskQueue;
@@ -342,88 +337,34 @@ namespace tpc
 		}
 
 	public:
-		static fletcher::Status Make(std::unique_ptr<ColumnScheduler> *column_scheduler, const std::shared_ptr<fletcher::Platform> &platform_)
+		static fletcher::Status Make(std::shared_ptr<ColumnScheduler> *column_scheduler, const std::shared_ptr<fletcher::Platform> &platform_)
 		{
 			//printf("[THREADS DEBUG]: Making Scheduler instance \n");
-			*column_scheduler = internal::make_unique<ColumnScheduler>(platform_);
+			*column_scheduler = std::make_shared<ColumnScheduler>(platform_);
 			//printf("[THREADS DEBUG]: Made Scheduler instance \n");
 			return fletcher::Status::OK();
 		};
 
-		inline double Schedule(const std::vector<std::vector<PtoaRegs>>& chunks)
-		{
-			double result = 0;
-			std::vector<std::future<double>> futures(chunks.size());
-			//printf("[THREADS DEBUG]: %d number of tasks will be submitted\n", chunks.size());
-			for (int i = 0; i < chunks.size(); ++i)
-			{
-				//printf("[TASK NO] Reg is : %lu\n", (uint64_t) chunks[i][0].device_parquet_address);
-				futures[i] = pool.submit(std::bind(&ColumnScheduler::RunInstanceProjection, this, std::move(chunks[i])));
-			}
-			for (int i = 0; i < chunks.size(); ++i)
-			{
-				result += futures[i].get();
-			}
-			return result;
-		}
-		inline fletcher::Status Submit(const std::vector<std::vector<PtoaRegs>>& chunks)
-		{
-			std::vector<std::future<double>> futures(chunks.size());
-			//futures.resize(chunks.size());
-			//printf("[THREADS DEBUG]: %d number of tasks will be submitted\n", chunks.size());
-			for (int i = 0; i < chunks.size(); ++i)
-			{
-				//printf("[TASK NO] Reg is : %lu\n", (uint64_t) chunks[i][0].device_parquet_address);
-				futures[i] = pool.submit(std::bind(&ColumnScheduler::RunInstanceProjection, this, std::move(chunks[i])));
-			}
-                        for(auto & f: futures)
-                        {
-                            results.push_back(f.get()); 
-                        }
-                        tasks_submitted = true;
-                        return fletcher::Status::OK();
-		}
-		inline bool future_is_ready(std::future<double> const &f)
-		{
-			return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-		}
-		inline bool hasNext()
-		{
-			return (results.size() > 0) and tasks_submitted ;
-		}
-		inline double Next()
-		{
-                        while(!tasks_submitted)
-                        {} 
-                        auto result = results.front(); 
-                        results.pop_front();
-                        return result;
-			//auto it_future = futures.begin();
-			// We iterate until future which is not ready
-			//std::future<double> curr;
-                        //double res;
-                        //for(auto & f: futures)
-                        //{
-                        //    results.push_back(f.get()); 
-                        //}
-			//while (!future_is_ready(*it_future))
-			//{
-                        //        std::cout << "next future\n";
-                        //        curr = std::move(*it_future);
-                        //        res = curr.get();
-			//	// Go to next future
-			//	it_future++;
-			//}
-			//futures.erase(it_future);
-			//return res;
-		}
+		double Schedule(const std::vector<std::vector<PtoaRegs>>& chunks);
+		fletcher::Status Submit(const std::vector<std::vector<PtoaRegs>>& chunks);
+		bool future_is_ready(std::future<double> const &f);
+		bool hasNext();
+		double Next();
 
                 ~ColumnScheduler() = default;
-                ColumnScheduler (const ColumnScheduler&) = delete;
-                ColumnScheduler& operator= (const ColumnScheduler&) = delete;
+                //ColumnScheduler (const ColumnScheduler&) = delete;
+                //ColumnScheduler& operator= (const ColumnScheduler&) = delete;
 
-		explicit ColumnScheduler(std::shared_ptr<fletcher::Platform> platform_) : platform(std::move(platform_))
+		explicit ColumnScheduler(const std::shared_ptr<fletcher::Platform>& platform_) : platform(platform_)
 		{
+		}
+		explicit ColumnScheduler(const std::string& platform_name)
+		{
+			//printf("[THREADS DEBUG]: Making Scheduler instance \n");
+                        //printf("Creating platform\n");
+
+                        ASSERT_FLETCHER_OK(fletcher::Platform::Make("snap", &platform, false));
+                        ASSERT_FLETCHER_OK(platform->Init());
 		}
 
 	private:

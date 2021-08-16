@@ -15,6 +15,8 @@ set(PROJECT_VERSION_MAJOR 0)
 set(PROJECT_VERSION_MINOR 1)
 set(PROJECT_VERSION_PATCH 0)
 
+set (CMAKE_CXX_STANDARD 17)
+
 link_directories($ENV{WORK}/local/lib $ENV{WORK}/local/lib64)
 # Setup JNI
 find_package(JNI REQUIRED)
@@ -42,6 +44,7 @@ file(GLOB LIB_SRC_3
 # Sources
 file(GLOB LIB_SRC_1
   "arrow/FileReader.cpp"
+  "arrow/ColumnScheduler.cpp"
   "arrow/PlatformWrapper.cpp"
   "arrow/DataSetParquetReader.cpp"
   "arrow/FletcherParquetReader.cpp"
@@ -59,4 +62,4 @@ file(GLOB LIB_SRC_2
 set (LIB_NAME native)
 add_library(${LIB_NAME} SHARED ${LIB_SRC_1} ${LIB_SRC_2} ${LIB_SRC_3})
 install(TARGETS ${LIB_NAME} LIBRARY DESTINATION .)
-target_link_libraries(${LIB_NAME} $ENV{WORK}/local/lib $ENV{WORK}/local/lib64 gandiva_jni protobuf arrow_dataset arrow fletcher fletcher_snap parquet)
+target_link_libraries(${LIB_NAME} gandiva_jni protobuf arrow_dataset arrow fletcher fletcher_snap parquet)
