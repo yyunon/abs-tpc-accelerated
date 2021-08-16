@@ -1,1 +1,0 @@
-/home/yyonsel/bulk/.m2/com/google/protobuf/protobuf-java/3.7.1/protobuf-java-3.7.1.jar
