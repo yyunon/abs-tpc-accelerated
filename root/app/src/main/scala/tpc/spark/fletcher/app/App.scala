@@ -3,10 +3,10 @@
  */
 package tpc.spark.fletcher.app
 
-import tpc.spark.fletcher.utilities.ScoptConfig.Config
-import tpc.spark.fletcher.utilities.InitSpark
-import tpc.spark.fletcher.utilities.Dataset
-import tpc.spark.fletcher.utilities.TPCQueries
+import tpc.spark.fletcher.app.utils.ScoptConfig.Config
+import tpc.spark.fletcher.app.utils.InitSpark
+import tpc.spark.fletcher.app.utils.Dataset
+import tpc.spark.fletcher.app.utils.TPCQueries
 import scopt.OParser
 import java.io.File
 import scala.reflect.io.Directory

@@ -12,82 +12,70 @@
     <packaging>jar</packaging>
     <dependencies>
         <dependency>
-            <groupId>tpc.spark.fletcher</groupId>
-            <artifactId>utilities</artifactId>
-            <version>1.0</version>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>3.7.1</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/org.scala-lang/scala-library -->
-        <dependency>
-            <groupId>org.scala-lang</groupId>
-            <artifactId>scala-library</artifactId>
-            <version>2.12.8</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.scala-lang/scala-reflect -->
-        <dependency>
-            <groupId>org.scala-lang</groupId>
-            <artifactId>scala-reflect</artifactId>
-            <version>2.12.8</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.scala-lang/scala-compiler -->
-        <dependency>
-            <groupId>org.scala-lang</groupId>
-            <artifactId>scala-compiler</artifactId>
-            <version>2.12.8</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.apache.spark/spark-sql -->
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_2.12</artifactId>
-            <version>3.0.0</version>
-            <scope>provided</scope>
+             <exclusions>
+                <exclusion>
+                  <groupId>com.google.protobuf</groupId>
+                  <artifactId>protobuf-java</artifactId>
+                </exclusion>
+             </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_2.12</artifactId>
-            <version>3.0.0</version>
+             <exclusions>
+                <exclusion>
+                  <groupId>com.google.protobuf</groupId>
+                  <artifactId>protobuf-java</artifactId>
+                </exclusion>
+             </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-catalyst_2.12</artifactId>
-            <version>3.0.0</version>
+             <exclusions>
+                <exclusion>
+                  <groupId>com.google.protobuf</groupId>
+                  <artifactId>protobuf-java</artifactId>
+                </exclusion>
+             </exclusions>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/org.apache.spark/spark-launcher -->
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-launcher_2.12</artifactId>
-            <version>3.0.0</version>
+             <exclusions>
+                <exclusion>
+                  <groupId>com.google.protobuf</groupId>
+                  <artifactId>protobuf-java</artifactId>
+                </exclusion>
+             </exclusions>
         </dependency>
-
+        <dependency>
+            <groupId>tpc.spark.fletcher</groupId>
+            <artifactId>processor</artifactId>
+            <version>1.0</version>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/com.github.scopt/scopt -->
         <dependency>
             <groupId>com.github.scopt</groupId>
             <artifactId>scopt_2.12</artifactId>
             <version>4.0.0</version>
+            <exclusions>
+              <exclusion>
+                <groupId>org.scala-lang</groupId>
+                <artifactId>scala-library</artifactId>
+              </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
     <build>
     <plugins>
-      <plugin>
-        <groupId>org.scala-tools</groupId>
-        <artifactId>maven-scala-plugin</artifactId>
-        <version>2.15.2</version>
-        <executions>
-            <execution>
-                <goals>
-                    <goal>compile</goal>
-                    <goal>testCompile</goal>
-                </goals>
-            </execution>
-        </executions>
-        <configuration>
-            <sourceDir>src/main/scala</sourceDir>
-            <testSourceDir>src/test/scala</testSourceDir>
-            <jvmArgs>
-                <jvmArg>-Xms64m</jvmArg>
-                <jvmArg>-Xmx1024m</jvmArg>
-            </jvmArgs>
-        </configuration>
-    </plugin>
        <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-shade-plugin</artifactId>
@@ -106,11 +94,100 @@
                               <mainClass>tpc.spark.fletcher.app.App</mainClass>
                           </transformer>
                       </transformers>
-                      <finalName>app</finalName>
+                      <finalName>fletcher</finalName>
+                      <filters>
+                          <filter>
+                              <artifact>*:*</artifact>
+                              <excludes>
+                                  <exclude>META-INF/*.SF</exclude>
+                                  <exclude>META-INF/*.DSA</exclude>
+                                  <exclude>META-INF/*.RSA</exclude>
+                              </excludes>
+                          </filter>
+                          <!--
+                          <filter>  
+                            <artifact>tpc.spark.fletcher:gandiva</artifact>
+                            <excludeDefaults>false</excludeDefaults>
+                            <includes>
+                              <include>gandiva/ipc/GandivaTypes.Schema.class</include>
+                            </includes>
+                          </filter>
+                          -->
+                      </filters>
+                      <artifactSet>
+                          <excludes>
+                              <exclude>org.apache.spark:spark-core</exclude>
+                              <exclude>org.apache.spark:spark-sql</exclude>
+                              <exclude>org.apache.spark:spark-catalyst</exclude>
+                              <exclude>org.apache.spark:spark-launcher</exclude>
+                          </excludes>
+                      </artifactSet>
+                    <relocations>
+                      <relocation>
+                        <pattern>org.codehaus.plexus.util</pattern>
+                        <shadedPattern>org.shaded.plexus.util</shadedPattern>
+                        <excludes>
+                          <exclude>org.codehaus.plexus.util.xml.Xpp3Dom</exclude>
+                          <exclude>org.codehaus.plexus.util.xml.pull.*</exclude>
+                        </excludes>
+                      </relocation>
+                    </relocations>
                   </configuration>
               </execution>
           </executions>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>2.9</version>
+        <executions>
+          <execution>
+            <id>build-classpath</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>build-classpath</goal>
+            </goals>
+            <configuration>
+              <!-- configure the plugin here -->
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!--
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>3.0.0-M1</version>
+        <executions>
+          <execution>
+            <id>enforce</id>
+            <configuration>
+              <rules>
+                <dependencyConvergence/>
+              </rules>
+            </configuration>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      -->
+       <plugin>
+          <groupId>net.alchim31.maven</groupId>
+          <artifactId>scala-maven-plugin</artifactId>
+          <version>4.5.3</version>
+          <executions>
+              <execution>
+                  <goals>
+                      <goal>compile</goal>
+                  </goals>
+              </execution>
+          </executions>
+          <configuration>
+            <scalaVersion>2.12.8</scalaVersion>
+          </configuration>
+        </plugin>
     </plugins>
     </build>
 </project>
