@@ -21,9 +21,9 @@ namespace tpc
     //column_scheduler = new ColumnScheduler(platform);
   }
   
-  fletcher::Status PlatformWrapper::Submit(PtoaRegs** regs)
+  fletcher::Status PlatformWrapper::Submit(int num_row_groups,PtoaRegs** regs)
   {
-    ASSERT_FLETCHER_OK(column_scheduler->Submit(regs));
+    ASSERT_FLETCHER_OK(column_scheduler->Submit(num_row_groups,regs));
     return fletcher::Status::OK();
   }
 

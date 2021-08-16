@@ -3,6 +3,7 @@
 #include <queue>
 #include <thread>
 #include <future>
+#include <chrono>
 #include <condition_variable>
 #include "Util.h"
 
@@ -10,6 +11,11 @@ namespace tpc
 {
 	//static thread_local uint32_t instance_index;
 	extern __thread uint32_t instance_index;
+        extern std::condition_variable cv;
+        extern std::mutex mmio_mtx;
+        static bool block_mmio_1;
+        static bool block_mmio_2;
+        static bool block_mmio_3;
 	namespace internal
 	{
 		//class FunctionWrapper;
@@ -213,7 +219,7 @@ namespace tpc
 			{
 				const uint32_t thread_count = NUM_THREADS;
 
-				//printf("[THREADS DEBUG]: %d threads dispatched.\n", thread_count);
+				printf("[THREADS DEBUG]: %d threads dispatched.\n", thread_count);
 
 				try
 				{
@@ -279,60 +285,53 @@ namespace tpc
 	// Spark side. Row group readers are assigned to tasks in the thread pool.
 	class ColumnScheduler
 	{
-
 		internal::PlatformWrapper p_w;
 		inline double RunInstanceProjection(PtoaRegs* regs)
 		{
-			//printf("[THREAD NO %d]: Task running...\n", instance_index);
+			printf("[THREAD NO %d]: Task running...\n", instance_index);
 			double result = p_w.call([&](std::shared_ptr<fletcher::Platform> &platform_g)
-															 {
-																 //We calculate the base offsets.
-																 std::vector<uint64_t> base_offsets_;
-																 for (int i = 0; i < (NUM_COLS + 1); ++i) //Reset
-																	 base_offsets_.push_back(tpc::calculate_reg_base_offset(i + (NUM_COLS + 1) * instance_index));
+                        {
+                            std::unique_lock<std::mutex> mmio_locker(mmio_mtx);
+                            //We calculate the base offsets.
+                            std::vector<uint64_t> base_offsets_;
+                            for (int i = 0; i < (NUM_COLS + 1); ++i) //Reset
+                            base_offsets_.push_back(tpc::calculate_reg_base_offset(i + (NUM_COLS + 1) * instance_index));
 
-																 // Load the platform object
-																 platform_g = std::atomic_load(&platform);
+                            platform_g = std::atomic_load(&platform);
+                            for (int i = 0; i < (NUM_COLS + 1); ++i) //Reset
+                            {
+                              platform_g->WriteMMIO(base_offsets_[i], 0, 0x04);
+                              platform_g->WriteMMIO(base_offsets_[i], 0, 0);
+                            }
+                            for (int i = 0; i < NUM_COLS; ++i) //Set PTOA regs of column readers
+                            {
+                              dau_t mmio64_writer;
+                              platform_g->WriteMMIO(base_offsets_[i], REG_BASE + 0, regs[i].num_val);
 
-																 for (int i = 0; i < (NUM_COLS + 1); ++i) //Reset
-																 {
-																	 platform_g->WriteMMIO(base_offsets_[i], 0, 0x04);
-																	 platform_g->WriteMMIO(base_offsets_[i], 0, 0);
-																 }
-																 for (int i = 0; i < NUM_COLS; ++i) //Set PTOA regs of column readers
-																 {
-																	 dau_t mmio64_writer;
-																	 platform_g->WriteMMIO(base_offsets_[i], REG_BASE + 0, regs[i].num_val);
+                              mmio64_writer.full = (da_t)regs[i].device_parquet_address;
+                              platform_g->WriteMMIO(base_offsets_[i], REG_BASE + 1, mmio64_writer.lo);
+                              platform_g->WriteMMIO(base_offsets_[i], REG_BASE + 2, mmio64_writer.hi);
 
-																	 mmio64_writer.full = (da_t)regs[i].device_parquet_address;
-																	 platform_g->WriteMMIO(base_offsets_[i], REG_BASE + 1, mmio64_writer.lo);
-																	 platform_g->WriteMMIO(base_offsets_[i], REG_BASE + 2, mmio64_writer.hi);
-
-																	 mmio64_writer.full = regs[i].max_size;
-																	 platform_g->WriteMMIO(base_offsets_[i], REG_BASE + 3, mmio64_writer.lo);
-																	 platform_g->WriteMMIO(base_offsets_[i], REG_BASE + 4, mmio64_writer.hi);
-																 }
-																 for (int i = NUM_COLS; i >= 0; --i) //Start
-																 {
-																	 platform_g->WriteMMIO(base_offsets_[i], 0, 0x01);
-																	 platform_g->WriteMMIO(base_offsets_[i], 0, 0);
-																 }
-																 // The last col. is the compute kernel we listen that one.
-																 ASSERT_FLETCHER_OK(tpc::WaitForFinish(platform_g, base_offsets_[NUM_COLS], 151 + instance_index * 10));
-																 uint32_t rlow, rhigh;
-																 platform_g->ReadMMIO(base_offsets_[NUM_COLS], 0xF, &rlow);
-																 platform_g->ReadMMIO(base_offsets_[NUM_COLS], 0xE, &rhigh);
-																 uint64_t result_r = rhigh;
-																 result_r = (result_r << 32) | rlow;
-																 for (int i = 0; i < (NUM_COLS + 1); ++i) //Reset
-																 {
-																	 platform_g->WriteMMIO(base_offsets_[i], 0, 0x04);
-																	 platform_g->WriteMMIO(base_offsets_[i], 0, 0);
-																 }
-																 return double(result_r) / (double)(1 << 18);
-																 //tpc::ReadResultFloat(platform_g, base_offsets_[NUM_COLS], *result);
-															 });
-			//printf("[THREAD NO: %d]: Result is %f ...\n", instance_index, result);
+                              mmio64_writer.full = regs[i].max_size;
+                              platform_g->WriteMMIO(base_offsets_[i], REG_BASE + 3, mmio64_writer.lo);
+                              platform_g->WriteMMIO(base_offsets_[i], REG_BASE + 4, mmio64_writer.hi);
+                            }
+                            for (int i = NUM_COLS; i >= 0; --i) //Start
+                            {
+                              platform_g->WriteMMIO(base_offsets_[i], 0, 0x01);
+                              platform_g->WriteMMIO(base_offsets_[i], 0, 0);
+                            }
+                            // The last col. is the compute kernel we listen that one.
+                            //ASSERT_FLETCHER_OK(tpc::WaitForFinish(platform_g, base_offsets_[NUM_COLS], 151 + instance_index * 1000));
+                            //for (int i = 0; i < (NUM_COLS + 1); ++i) //Reset
+                            //{
+                            //platform_g->WriteMMIO(base_offsets_[i], 0, 0x04);
+                            //platform_g->WriteMMIO(base_offsets_[i], 0, 0);
+                            //}
+                            return double(result_r) / (double)(1 << 18);
+                            //tpc::ReadResultFloat(platform_g, base_offsets_[NUM_COLS], *result);
+                        });
+			printf("[THREAD NO: %d]: Result is %f ...\n", instance_index, result);
 			return result;
 		}
 
@@ -346,7 +345,7 @@ namespace tpc
 		};
 
 		double Schedule(const std::vector<std::vector<PtoaRegs>>& chunks);
-		fletcher::Status Submit(PtoaRegs** chunks);
+		fletcher::Status Submit(int chunk_size, PtoaRegs** chunks);
 		bool future_is_ready(std::future<double> const &f);
 		bool hasNext();
 		double Next();

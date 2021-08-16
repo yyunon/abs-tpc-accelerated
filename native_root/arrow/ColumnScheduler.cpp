@@ -20,13 +20,12 @@ namespace tpc
 			}
 			return result;
                 }
-		fletcher::Status ColumnScheduler::Submit(PtoaRegs** chunks)
+		fletcher::Status ColumnScheduler::Submit(int chunk_size, PtoaRegs** chunks)
 		{
-                        int chunks_size = sizeof(chunks) / sizeof(chunks[0]);
-			std::vector<std::future<double>> futures(chunks_size);
+			std::vector<std::future<double>> futures(chunk_size);
 			//futures.resize(chunks.size());
-			printf("[THREADS DEBUG]: %d number of tasks will be submitted\n", chunks_size);
-			for (int i = 0; i < chunks_size; ++i)
+			printf("[THREADS DEBUG]: %d number of tasks will be submitted\n", chunk_size);
+			for (int i = 0; i < chunk_size; ++i)
 			{       
                                 PtoaRegs* chunks_to_send = chunks[i];
 				//printf("[TASK NO] Reg is : %lu\n", (uint64_t) chunks[i][0].device_parquet_address);
