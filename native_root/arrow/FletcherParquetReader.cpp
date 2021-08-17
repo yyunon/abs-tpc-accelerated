@@ -10,8 +10,8 @@
 
 __thread uint32_t tpc::instance_index;
 __thread tpc::internal::WorkStealingTaskQueue *tpc::internal::ThreadPool::local_worker_queue;
-std::condition_variable tpc::cv;
-std::mutex tpc::mmio_mtx;
+//std::condition_variable tpc::cv;
+//std::mutex tpc::mmio_mtx;
 //static bool tpc::block_mmio;
 
 namespace tpc
