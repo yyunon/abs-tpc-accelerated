@@ -28,7 +28,7 @@ namespace tpc
 			for (int i = 0; i < chunk_size; ++i)
 			{       
                                 PtoaRegs* chunks_to_send = chunks[i];
-				//printf("[TASK NO] Reg is : %lu\n", (uint64_t) chunks[i][0].device_parquet_address);
+				//printf("[TASK NO] Reg is : %lu\n", (uint64_t) chunks_to_send->device_parquet_address);
 				futures[i] = pool.submit(std::bind(&ColumnScheduler::RunInstanceProjection, this, chunks_to_send));
 			}
                         for(auto & f: futures)

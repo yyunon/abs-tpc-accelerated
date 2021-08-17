@@ -27,29 +27,32 @@ namespace tpc
 		//We use this platform wrapper to lock platform instances so that make sure mmio regs is set carefully.
 		class ThreadSafePlatform
 		{
+			std::atomic_bool mmio_busy = false;
 			std::shared_ptr<fletcher::Platform> platform_g;
 			mutable std::mutex platform_mtx;
-			bool mmio_busy = false;
 			std::condition_variable mmio_condition;
 
 		public:
 			template <class Operation>
-			ThreadSafePlatform() {}
+			ThreadSafePlatform() {};
+			ThreadSafePlatform(bool start): mmio_busy(start) {}
 
 			inline fletcher::Status Reset(std::shared_ptr<fletcher::Platform> &platform, const std::vector<uint64_t> &base_offsets_)
 			{
-				std::unique_lock<std::mutex> platform_locker(platform_mtx);
 				platform_g = std::atomic_load(&platform);
-				mmio_condition.wait(platform_locker, []
+				std::unique_lock<std::mutex> platform_locker(platform_mtx);
+				mmio_condition.wait(platform_locker, [this]
 														{ return mmio_busy == false; });
-				platform_locker.lock();
+				//platform_locker.lock();
+                                printf("[THREAD NO %d]: Locked...\n", instance_index);
 				mmio_busy = true;
 				for (int i = 0; i < (NUM_COLS + 1); ++i) //Reset
 				{
 					platform_g->WriteMMIO(base_offsets_[i], 0, 0x04);
 					platform_g->WriteMMIO(base_offsets_[i], 0, 0);
 				}
-				platform_locker.unlock();
+				//platform_locker.unlock();
+                                printf("[THREAD NO %d]: Unlocked...\n", instance_index);
 				mmio_busy = false;
 				mmio_condition.notify_one();
 				return fletcher::Status::OK();
@@ -59,23 +62,24 @@ namespace tpc
 			{
 				std::unique_lock<std::mutex> platform_locker(platform_mtx);
 				platform_g = std::atomic_load(&platform);
-				mmio_condition.wait(platform_locker, []
+				mmio_condition.wait(platform_locker, [this]
 														{ return mmio_busy == false; });
-				platform_locker.lock();
+				//platform_locker.lock();
 				mmio_busy = true;
+                                printf("[THREAD NO %d]: Locked...\n", instance_index);
 				for (int i = NUM_COLS; i >= 0; --i) //Start
 				{
 					platform_g->WriteMMIO(base_offsets_[i], 0, 0x01);
 					platform_g->WriteMMIO(base_offsets_[i], 0, 0);
 				}
-				platform_locker.unlock();
+				//platform_locker.unlock();
 				mmio_busy = false;
+                                printf("[THREAD NO %d]: Unlocked...\n", instance_index);
 				mmio_condition.notify_one();
 				return fletcher::Status::OK();
 			}
 			inline fletcher::Status WaitForFinish(std::shared_ptr<fletcher::Platform> &platform, uint64_t offset, unsigned int poll_interval_usec)
 			{
-				std::unique_lock<std::mutex> platform_locker(platform_mtx);
 				platform_g = std::atomic_load(&platform);
 				//FLETCHER_LOG(DEBUG, "Polling kernel for completion.");
 				uint32_t status = 0;
@@ -92,13 +96,16 @@ namespace tpc
 				{
 					do
 					{
+                                                std::unique_lock<std::mutex> platform_locker(platform_mtx);
 						std::this_thread::sleep_for(std::chrono::milliseconds(poll_interval_usec));
-						mmio_condition.wait(platform_locker, []
+						mmio_condition.wait(platform_locker, [this]
 																{ return mmio_busy == false; });
-						platform_locker.lock();
+						//platform_locker.lock();
 						mmio_busy = true;
+                                                printf("[THREAD NO %d]: Locked...\n", instance_index);
 						platform_g->ReadMMIO(offset, 0x01, &status);
-						platform_locker.unlock();
+						//platform_locker.unlock();
+                                                printf("[THREAD NO %d]: Unlocked...\n", instance_index);
 						mmio_busy = false;
 						mmio_condition.notify_one();
 					} while ((status & done_status_mask) != done_status);
@@ -109,16 +116,16 @@ namespace tpc
 
 			inline double ReadResult(std::shared_ptr<fletcher::Platform> &platform, uint64_t offset, unsigned int poll_interval_usec)
 			{
-				std::unique_lock<std::mutex> platform_locker(platform_mtx);
 				platform_g = std::atomic_load(&platform);
 				uint32_t rlow, rhigh;
-				mmio_condition.wait(platform_locker, []
+				std::unique_lock<std::mutex> platform_locker(platform_mtx);
+				mmio_condition.wait(platform_locker, [this]
 														{ return mmio_busy == false; });
-				platform_locker.lock();
+				//platform_locker.lock();
 				mmio_busy = true;
 				platform_g->ReadMMIO(offset, 0xF, &rlow);
 				platform_g->ReadMMIO(offset, 0xE, &rhigh);
-				platform_locker.unlock();
+				//platform_locker.unlock();
 				mmio_busy = false;
 				mmio_condition.notify_one();
 				uint64_t result_r = rhigh;
@@ -127,11 +134,11 @@ namespace tpc
 			}
 			inline fletcher::Status setPtoaArguments(std::shared_ptr<fletcher::Platform> &platform, const std::vector<uint64_t> &base_offsets_, PtoaRegs *regs)
 			{
-				std::unique_lock<std::mutex> platform_locker(platform_mtx);
 				platform_g = std::atomic_load(&platform);
-				mmio_condition.wait(platform_locker, []
+				std::unique_lock<std::mutex> platform_locker(platform_mtx);
+				mmio_condition.wait(platform_locker, [this]
 														{ return mmio_busy == false; });
-				platform_locker.lock();
+				//platform_locker.lock();
 				mmio_busy = true;
 				for (int i = 0; i < NUM_COLS; ++i) //Set PTOA regs of column readers
 				{
@@ -146,12 +153,12 @@ namespace tpc
 					platform_g->WriteMMIO(base_offsets_[i], REG_BASE + 3, mmio64_writer.lo);
 					platform_g->WriteMMIO(base_offsets_[i], REG_BASE + 4, mmio64_writer.hi);
 				}
-				platform_locker.unlock();
+				//platform_locker.unlock();
 				mmio_busy = false;
 				mmio_condition.notify_one();
 				return fletcher::Status::OK();
 			}
-
+                        template <class Operation>
 			auto call(Operation o) -> decltype(o(platform_g))
 			{
 				std::unique_lock<std::mutex> platform_locker(platform_mtx);
@@ -404,19 +411,21 @@ namespace tpc
 	// Spark side. Row group readers are assigned to tasks in the thread pool.
 	class ColumnScheduler
 	{
-		internal::PlatformWrapper p_w;
+		internal::ThreadSafePlatform p_w;
+		std::shared_ptr<fletcher::Platform> platform;
 		inline double RunInstanceProjection(PtoaRegs *regs)
 		{
+                        std::this_thread::sleep_for(std::chrono::milliseconds(100 * instance_index));
 			printf("[THREAD NO %d]: Task running...\n", instance_index);
 			//We calculate the base offsets.
 			std::vector<uint64_t> base_offsets_;
 			for (int i = 0; i < (NUM_COLS + 1); ++i)
 				base_offsets_.push_back(tpc::calculate_reg_base_offset(i + (NUM_COLS + 1) * instance_index));
-			ASSERT_FLETCHER_OK(p_w.Reset(std::move(platform), base_offsets_));
-			ASSERT_FLETCHER_OK(p_w.setPtoaArguments(std::move(platform), base_offsets_, regs));
-			ASSERT_FLETCHER_OK(p_w.Start(std::move(platform), base_offsets_));
-			ASSERT_FLETCHER_OK(p_w.WaitForFinish(std::move(platform), base_offsets_[NUM_COLS], instance_index * 100));
-			double result = p_w.ReadResult(std::move(platform), base_offsets_[NUM_COLS], instance_index * 100);
+			ASSERT_FLETCHER_OK(p_w.Reset(platform, base_offsets_));
+			ASSERT_FLETCHER_OK(p_w.setPtoaArguments(platform, base_offsets_, regs));
+			ASSERT_FLETCHER_OK(p_w.Start(platform, base_offsets_));
+			ASSERT_FLETCHER_OK(p_w.WaitForFinish(platform, base_offsets_[NUM_COLS], instance_index * 500));
+			double result = p_w.ReadResult(platform, base_offsets_[NUM_COLS], instance_index * 100);
 			printf("[THREAD NO: %d]: Result is %f ...\n", instance_index, result);
 			return result;
 		}
@@ -436,24 +445,15 @@ namespace tpc
 		bool hasNext();
 		double Next();
 
-		~ColumnScheduler() = default;
+		~ColumnScheduler() = default ;
 		//ColumnScheduler (const ColumnScheduler&) = delete;
 		//ColumnScheduler& operator= (const ColumnScheduler&) = delete;
 
-		explicit ColumnScheduler(const std::shared_ptr<fletcher::Platform> &platform_) : platform(platform_)
+		ColumnScheduler(const std::shared_ptr<fletcher::Platform> &platform_) : p_w(false), platform(platform_)
 		{
-		}
-		explicit ColumnScheduler(const std::string &platform_name)
-		{
-			//printf("[THREADS DEBUG]: Making Scheduler instance \n");
-			//printf("Creating platform\n");
-
-			ASSERT_FLETCHER_OK(fletcher::Platform::Make("snap", &platform, false));
-			ASSERT_FLETCHER_OK(platform->Init());
 		}
 
 	private:
-		std::shared_ptr<fletcher::Platform> platform;
 		std::vector<std::vector<PtoaRegs>> chunks;
 		internal::ThreadPool pool;
 		const int num_of_instances = NUM_THREADS;
