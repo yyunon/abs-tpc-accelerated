@@ -37,7 +37,7 @@ namespace tpc
         //FletcherParquetReader(std::shared_ptr<arrow::MemoryPool> &memory_pool,
         //                      const std::string &file_name, const std::shared_ptr<arrow::Schema> &schema_file,
         //                      const std::shared_ptr<arrow::Schema> &schema_out, int num_rows);
-        FletcherParquetReader(PlatformWrapper* platform_w, const std::string &file_name, const std::shared_ptr<arrow::Schema> &schema_file, const std::shared_ptr<arrow::Schema> &schema_out, int num_rows);
+        FletcherParquetReader(PlatformWrapper* platform_w, uint64_t group_length, PtoaRegs** regs, const std::string &file_name, const std::shared_ptr<arrow::Schema> &schema_file, const std::shared_ptr<arrow::Schema> &schema_out, int num_rows);
         FletcherParquetReader();
         ~FletcherParquetReader() = default;
         static double Next(PlatformWrapper* platform_w);

@@ -16,42 +16,24 @@
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_2.12</artifactId>
-             <exclusions>
+             <!--exclusions>
                 <exclusion>
                   <groupId>com.google.protobuf</groupId>
                   <artifactId>protobuf-java</artifactId>
                 </exclusion>
-             </exclusions>
+             </exclusions-->
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_2.12</artifactId>
-             <exclusions>
-                <exclusion>
-                  <groupId>com.google.protobuf</groupId>
-                  <artifactId>protobuf-java</artifactId>
-                </exclusion>
-             </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-catalyst_2.12</artifactId>
-             <exclusions>
-                <exclusion>
-                  <groupId>com.google.protobuf</groupId>
-                  <artifactId>protobuf-java</artifactId>
-                </exclusion>
-             </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-launcher_2.12</artifactId>
-             <exclusions>
-                <exclusion>
-                  <groupId>com.google.protobuf</groupId>
-                  <artifactId>protobuf-java</artifactId>
-                </exclusion>
-             </exclusions>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.slf4j/slf4j-api -->
         <dependency>
@@ -71,12 +53,6 @@
             <artifactId>guava</artifactId>
             <version>23.0</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/com.google.protobuf/protobuf-java -->
-        <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-            <version>3.7.1</version>
-        </dependency>
         <!-- https://mvnrepository.com/artifact/org.apache.arrow/arrow-memory -->
         <dependency>
             <groupId>org.apache.arrow</groupId>
@@ -93,25 +69,6 @@
     </dependencies>
     <build>
             <plugins>
-                  <plugin>
-                    <groupId>com.googlecode.addjars-maven-plugin</groupId>
-                    <artifactId>addjars-maven-plugin</artifactId>
-                    <version>1.0.5</version>
-                    <executions>
-                        <execution>
-                            <goals>
-                                <goal>add-jars</goal>
-                            </goals>
-                            <configuration>
-                                <resources>
-                                    <resource>
-                                        <directory>${env.GANDIVA_JAR_DIR}/arrow-gandiva-0.17.1.jar</directory>
-                                    </resource>
-                                </resources>
-                            </configuration>
-                        </execution>
-                    </executions>
-                </plugin> 
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>

@@ -7,8 +7,8 @@ object NativeLibraryLoader {
   }
 
   private lazy val _load: Boolean = {
-    JniLoader
-      .getInstance() //needs to load gandiva libraries first to avoid conflicts (only package visible)
+    //JniLoader
+    //  .getInstance() //needs to load gandiva libraries first to avoid conflicts (only package visible)
     //val libpath_old = System.getProperty("java.library.path")
     //println(libpath_old)
     //System.setProperty(
@@ -25,7 +25,7 @@ object NativeLibraryLoader {
     System.loadLibrary("ocxl")
     System.loadLibrary("fletcher_snap")
     System.loadLibrary("fletcher")
-    System.loadLibrary("/home/yyonsel/bulk/project/local/lib64/libnative.so")
+    System.loadLibrary("libnative.so")
     //System.loadLibrary("native")
     true
   }

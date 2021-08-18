@@ -27,9 +27,12 @@ namespace tpc
         bool hasNext(); 
         //PlatformWrapper (const PlatformWrapper&) = delete;
         //PlatformWrapper& operator= (const PlatformWrapper&) = delete;
+        double duration_total;
+        double duration_meta;
+        double duration_compute;
+
         ~PlatformWrapper()
         {
-          std::cout << "Destructing scheduler instance\n";
           //delete column_scheduler;
         }
     };

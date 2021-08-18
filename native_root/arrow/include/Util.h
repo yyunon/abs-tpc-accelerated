@@ -30,6 +30,18 @@ struct PtoaRegs
 
 namespace tpc
 {
+        class timer {
+          public:
+              std::chrono::time_point<std::chrono::high_resolution_clock> lastTime;
+              timer() : lastTime(std::chrono::high_resolution_clock::now()) {}
+              inline double elapsed() {
+                  std::chrono::time_point<std::chrono::high_resolution_clock> thisTime=std::chrono::high_resolution_clock::now();
+                  double deltaTime = std::chrono::duration<double>(thisTime-lastTime).count();
+                  lastTime = thisTime;
+                  return deltaTime;
+              }
+        };
+        
 
 	//void setPtoaArguments(uint64_t col_base_offset, std::shared_ptr<fletcher::Platform> platform, uint32_t num_val,
 	//                      uint64_t max_size, da_t device_parquet_address)

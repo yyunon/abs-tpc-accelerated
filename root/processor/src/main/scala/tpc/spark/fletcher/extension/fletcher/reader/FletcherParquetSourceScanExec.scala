@@ -13,6 +13,7 @@ import tpc.spark.arrow.fletcher.FletcherParquetReaderIterator
 import tpc.spark.arrow.fletcher.PlatformWrapper
 import tpc.spark.fletcher.extension.columnar.ArrowColumnarConverters._
 import tpc.spark.fletcher.extension.measuring.TimeMeasuringIterator
+
 import org.apache.arrow.vector.types.pojo.Schema
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkArrowUtils
@@ -23,6 +24,12 @@ import org.apache.spark.{
   SparkContext,
   TaskContext
 }
+
+import org.apache.parquet.hadoop.metadata.BlockMetaData
+import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData
+import org.apache.parquet.hadoop.ParquetFileReader
+
+
 import org.apache.spark.rdd.{EmptyRDD, PartitionwiseSampledRDD, RDD}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions._
@@ -59,6 +66,9 @@ import org.apache.spark.{Partition, TaskContext}
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.util.collection.BitSet
+
+import scala.collection.mutable.ListBuffer
+import scala.collection.JavaConverters._
 
 case class Tpch6Row(
     revenue: Double
@@ -97,9 +107,26 @@ case class FletcherParquetSourceScanExec(
     new GenericInternalRow(arr)
   }
 
+  var file_path = new ListBuffer[String]()
+  var ext_column_offset = new ListBuffer[Long]()
+  var ext_column_size = new ListBuffer[Long]()
+  var ext_column_values = new ListBuffer[Long]()
+
+  var disc_column_offset = new ListBuffer[Long]()
+  var disc_column_size = new ListBuffer[Long]()
+  var disc_column_values = new ListBuffer[Long]()
+
+  var quant_column_offset = new ListBuffer[Long]()
+  var quant_column_size = new ListBuffer[Long]()
+  var quant_column_values = new ListBuffer[Long]()
+
+  var ship_column_offset = new ListBuffer[Long]()
+  var ship_column_size = new ListBuffer[Long]()
+  var ship_column_values = new ListBuffer[Long]()
+
   private def toEncodedRow(res: Double): InternalRow = {
     //val arr: Array[Any] = Array(res)
-    log.warn("RES: " + res.toString())
+    //log.warn("RES: " + res.toString())
     val arr = Tpch6Row(res)
     log.warn("RES: " + arr.toString())
     val fpgaOutEncoder = Encoders.product[Tpch6Row]
@@ -246,6 +273,7 @@ case class FletcherParquetSourceScanExec(
               maxSplitBytes = maxSplitBytes,
               partitionValues = partition.values
             )
+            
           } else {
             Seq.empty
           }
@@ -302,15 +330,69 @@ case class FletcherParquetSourceScanExec(
 
         //log.warn("Required Schema: " + requiredSchema.toString())
         val localFileName = file.filePath.replaceFirst("file://", "")
+        val path = new Path(localFileName);
+        val hadoop_conf = new Configuration()
+        val hadoop_reader = ParquetFileReader.open(hadoop_conf,path)
+        val blockMetaData = hadoop_reader.getRowGroups().asScala.toList
+        blockMetaData.foreach { rg =>
+            val hadoopColumns = rg.getColumns().asScala.toList
+            //var ext_column_offset = new ListBuffer[Long]()
+            //var ext_column_size = new ListBuffer[Long]()
+            //var ext_column_values = new ListBuffer[Long]()
+
+            //var disc_column_offset = new ListBuffer[Long]()
+            //var disc_column_size = new ListBuffer[Long]()
+            //var disc_column_values = new ListBuffer[Long]()
+
+            //var quant_column_offset = new ListBuffer[Long]()
+            //var quant_column_size = new ListBuffer[Long]()
+            //var quant_column_values = new ListBuffer[Long]()
+
+            //var ship_column_offset = new ListBuffer[Long]()
+            //var ship_column_size = new ListBuffer[Long]()
+            //var ship_column_values = new ListBuffer[Long]()
+            val ext = hadoopColumns(5)
+            ext_column_offset += ext.getStartingPos()
+            //ext_column_size += math.ceil((ext.getTotalUncompressedSize() + 64) / 64).toInt * 64
+            ext_column_size += ext.getTotalUncompressedSize()
+            ext_column_values += ext.getValueCount() 
+            val disc = hadoopColumns(6)
+            disc_column_offset += disc.getStartingPos()
+            //disc_column_size += math.ceil((disc.getTotalUncompressedSize() + 64) / 64).toInt * 64
+            disc_column_size += disc.getTotalUncompressedSize()
+            disc_column_values += disc.getValueCount() 
+            val quant = hadoopColumns(4)
+            quant_column_offset += quant.getStartingPos()
+            //quant_column_size += math.ceil((quant.getTotalUncompressedSize() + 64) / 64).toInt * 64
+            quant_column_size += quant.getTotalUncompressedSize()
+            quant_column_values += quant.getValueCount() 
+            val ship = hadoopColumns(10)
+            ship_column_offset += ship.getStartingPos()
+            //ship_column_size += math.ceil((ship.getTotalUncompressedSize() + 32) / 32).toInt * 32
+            ship_column_size += ship.getTotalUncompressedSize()
+            ship_column_values += ship.getValueCount() 
+            
+        }
+
+
         val fletcherReader = new FletcherParquetReaderIterator(
           processor.getOrElse(
             throw new IllegalAccessException("The Iterator is already closed")),
           localFileName,
-          file.start,
-          file.length,
+          ext_column_offset,
+          ext_column_size,
+          ext_column_values,
+          disc_column_offset,
+          disc_column_size,
+          disc_column_values,
+          quant_column_offset,
+          quant_column_size,
+          quant_column_values,
+          ship_column_offset,
+          ship_column_size,
+          ship_column_values,
           inputSchema,
-          outputSchema,
-          1000 //Not supported yet
+          outputSchema
         )
 
         fletcherReader

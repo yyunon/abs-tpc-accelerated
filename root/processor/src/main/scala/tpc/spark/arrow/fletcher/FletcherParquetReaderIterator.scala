@@ -20,15 +20,26 @@ import org.apache.spark.sql.catalyst.expressions.{
 import java.util.logging.Logger
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
+
 
 class FletcherParquetReaderIterator(
     val platform: Long,
     val fileName: String,
-    val fileOffset: Long,
-    val fileLength: Long,
+    val extColOffset: ListBuffer[Long],
+    val extColSize: ListBuffer[Long],
+    val extColVal: ListBuffer[Long],
+    val discColOffset: ListBuffer[Long],
+    val discColSize: ListBuffer[Long],
+    val discColVal: ListBuffer[Long],
+    val quantColOffset: ListBuffer[Long],
+    val quantColSize: ListBuffer[Long],
+    val quantColVal: ListBuffer[Long],
+    val shipColOffset: ListBuffer[Long],
+    val shipColSize: ListBuffer[Long],
+    val shipColVal: ListBuffer[Long],
     val inputSchema: Schema,
-    val outputSchema: Schema,
-    val batchSize: Int
+    val outputSchema: Schema
 ) extends Iterator[InternalRow] {
 
   private val log =
@@ -51,11 +62,21 @@ class FletcherParquetReaderIterator(
     initFletcherParquetReaderIterator(
       platform,
       fileName,
-      fileOffset,
-      fileLength,
+      extColOffset.toArray,
+      extColSize.toArray ,
+      extColVal.toArray ,
+      discColOffset.toArray ,
+      discColSize.toArray,
+      discColVal.toArray,
+      quantColOffset.toArray,
+      quantColSize.toArray ,
+      quantColVal.toArray ,
+      shipColOffset.toArray,
+      shipColSize.toArray ,
+      shipColVal.toArray ,
       inputSchemaBytes,
       outputSchemaBytes,
-      batchSize
+      100
     )
   }
 
@@ -75,7 +96,7 @@ class FletcherParquetReaderIterator(
   }
 
   override def next(): InternalRow = {
-    log.warning("Next...")
+    //log.warning("Next...")
     hasNext
     val res = preLoadedVar.getOrElse(
       throw new IllegalAccessException(
@@ -111,8 +132,18 @@ class FletcherParquetReaderIterator(
   @native def initFletcherParquetReaderIterator(
       platform_ptr: Long,
       fileName: String,
-      fileOffset: Long,
-      fileLength: Long,
+      extOffset: Array[Long],
+      extSize: Array[Long],
+      extValue: Array[Long],
+      discOffset: Array[Long],
+      discSize: Array[Long],
+      discValue: Array[Long],
+      quantOffset: Array[Long],
+      quantSize: Array[Long],
+      quantValue: Array[Long],
+      shipOffset: Array[Long],
+      shipSize: Array[Long],
+      shipValue: Array[Long],
       inputSchemaBytes: Array[Byte],
       outputSchemaBytes: Array[Byte],
       numRows: Int

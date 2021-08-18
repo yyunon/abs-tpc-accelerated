@@ -48,10 +48,10 @@ trait InitSpark {
 
     lazy val spark: SparkSession = builder
       .appName("TPC-DS-BENCHMARKING")
-      .config("spark.master", "spark://qce-power9.ewi.tudelft.nl:7077")
+      //.config("spark.master", "spark://qce-power9.ewi.tudelft.nl:7077")
       //.config("spark.master", "local[3]")
-      .config("spark.driver.memory", "32g")
-      .config("spark.sql.parquet.filterPushdown", false)
+      //.config("spark.driver.memory", "32g")
+      //.config("spark.sql.parquet.filterPushdown", false)
       .config("spark.sql.parquet.task.side.metadata", false)
       .config("spark.sql.inMemoryColumnarStorage.compressed", false)
       //.config("spark.sql.inMemoryColumnarStorage.batchSize", 10000000)

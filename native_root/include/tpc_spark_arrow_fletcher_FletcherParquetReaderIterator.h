@@ -10,10 +10,10 @@ extern "C" {
 /*
  * Class:     tpc_spark_arrow_fletcher_FletcherParquetReaderIterator
  * Method:    initFletcherParquetReaderIterator
- * Signature: (JLjava/lang/String;JJ[B[BI)J
+ * Signature: (JLjava/lang/String;[J[J[J[J[J[J[J[J[J[J[J[J[B[BI)J
  */
 JNIEXPORT jlong JNICALL Java_tpc_spark_arrow_fletcher_FletcherParquetReaderIterator_initFletcherParquetReaderIterator
-  (JNIEnv *, jobject, jlong, jstring, jlong, jlong, jbyteArray, jbyteArray, jint);
+  (JNIEnv *, jobject, jlong, jstring, jlongArray, jlongArray, jlongArray, jlongArray, jlongArray, jlongArray, jlongArray, jlongArray, jlongArray, jlongArray, jlongArray, jlongArray, jbyteArray, jbyteArray, jint);
 
 /*
  * Class:     tpc_spark_arrow_fletcher_FletcherParquetReaderIterator

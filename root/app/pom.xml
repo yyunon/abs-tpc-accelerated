@@ -12,49 +12,20 @@
     <packaging>jar</packaging>
     <dependencies>
         <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-            <version>3.7.1</version>
-        </dependency>
-        <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_2.12</artifactId>
-             <exclusions>
-                <exclusion>
-                  <groupId>com.google.protobuf</groupId>
-                  <artifactId>protobuf-java</artifactId>
-                </exclusion>
-             </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_2.12</artifactId>
-             <exclusions>
-                <exclusion>
-                  <groupId>com.google.protobuf</groupId>
-                  <artifactId>protobuf-java</artifactId>
-                </exclusion>
-             </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-catalyst_2.12</artifactId>
-             <exclusions>
-                <exclusion>
-                  <groupId>com.google.protobuf</groupId>
-                  <artifactId>protobuf-java</artifactId>
-                </exclusion>
-             </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-launcher_2.12</artifactId>
-             <exclusions>
-                <exclusion>
-                  <groupId>com.google.protobuf</groupId>
-                  <artifactId>protobuf-java</artifactId>
-                </exclusion>
-             </exclusions>
         </dependency>
         <dependency>
             <groupId>tpc.spark.fletcher</groupId>
@@ -102,6 +73,10 @@
                                   <exclude>META-INF/*.SF</exclude>
                                   <exclude>META-INF/*.DSA</exclude>
                                   <exclude>META-INF/*.RSA</exclude>
+                                  <exclude>org.apache.spark:spark-core</exclude>
+                                  <exclude>org.apache.spark:spark-sql</exclude>
+                                  <exclude>org.apache.spark:spark-catalyst</exclude>
+                                  <exclude>org.apache.spark:spark-launcher</exclude>
                               </excludes>
                           </filter>
                           <!--

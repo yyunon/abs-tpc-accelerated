@@ -25,11 +25,14 @@ if (JNI_FOUND)
 endif()
 
 find_package(Arrow REQUIRED)
+find_package(Boost)
+
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR}/jni/include)
 include_directories(${CMAKE_SOURCE_DIR}/arrow/include)
 include_directories($ENV{WORK}/local/include)
+include_directories(${BOOST_INDLUDE_DIR})
 include_directories(${JNI_INCLUDE_DIRS})
 include_directories(proto)
 

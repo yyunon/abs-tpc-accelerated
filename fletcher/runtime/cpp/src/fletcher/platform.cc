@@ -42,6 +42,9 @@ Status Platform::Make(const std::string &name, std::shared_ptr<fletcher::Platfor
   // Attempt to open shared library
   void *handle = nullptr;
   handle = dlopen(("libfletcher_" + name + DYLIB_EXT).c_str(), RTLD_NOW);
+  if (!quiet) {
+    FLETCHER_LOG(INFO, "Attempting to connect snap Fletcher hardware platform...");
+  }
 
   if (handle) {
     // Create a new platform

@@ -38,11 +38,11 @@
         </pluginRepository>
     </pluginRepositories>
     <dependencies>
-      <dependency>
+      <!--dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
-            <version>3.7.1</version>
-      </dependency>
+            <version>2.5.0</version>
+      </dependency-->
     </dependencies>
 
     <dependencyManagement>
@@ -53,48 +53,24 @@
             <artifactId>spark-sql_2.12</artifactId>
             <version>3.0.0</version>
             <scope>provided</scope>
-             <exclusions>
-                <exclusion>
-                  <groupId>com.google.protobuf</groupId>
-                  <artifactId>protobuf-java</artifactId>
-                </exclusion>
-             </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_2.12</artifactId>
             <version>3.0.0</version>
             <scope>provided</scope>
-             <exclusions>
-                <exclusion>
-                  <groupId>com.google.protobuf</groupId>
-                  <artifactId>protobuf-java</artifactId>
-                </exclusion>
-             </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-catalyst_2.12</artifactId>
             <version>3.0.0</version>
             <scope>provided</scope>
-             <exclusions>
-                <exclusion>
-                  <groupId>com.google.protobuf</groupId>
-                  <artifactId>protobuf-java</artifactId>
-                </exclusion>
-             </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-launcher_2.12</artifactId>
             <version>3.0.0</version>
             <scope>provided</scope>
-             <exclusions>
-                <exclusion>
-                  <groupId>com.google.protobuf</groupId>
-                  <artifactId>protobuf-java</artifactId>
-                </exclusion>
-             </exclusions>
         </dependency>
         <!-- https://mvnrepository.com/artifact/org.scala-lang/scala-library -->
         <dependency>

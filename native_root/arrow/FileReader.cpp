@@ -11,7 +11,7 @@ namespace tpc
         num_columns = pqFileMetadata->num_columns();
         num_row_groups = pqFileMetadata->num_row_groups();
         //std::cout << schema->ToString() << "\n";
-        std::cout << "num of row groups: " << num_row_groups << "\n";
+        //std::cout << "num of row groups: " << num_row_groups << "\n";
         for (int i = 0; i < num_row_groups; ++i)
         {
                 rowGroupMetadata.push_back(pqFileMetadata->RowGroup(i));
@@ -68,10 +68,10 @@ namespace tpc
           chunk->num_val = chunk_meta->num_values();
           auto device_addr = read_file(fpo, chunk_meta->total_uncompressed_size(), buffer_size);
           chunk->device_parquet_address = device_addr;
-          //printf("[METADATA_PARSER DEBUG] Metadata read file offset is : 0x%x %lu\n", fpo, fpo);
-          //printf("[METADATA_PARSER DEBUG] The address is : 0x%x, %lu\n", (uint64_t)chunk->device_parquet_address, (uint64_t)chunk->device_parquet_address);
-          //printf("[METADATA_PARSER DEBUG] The num of values are :0x%x, %lu\n ", chunk->num_val, chunk->num_val);
-          //printf("[METADATA_PARSER DEBUG] Uncompressed size are :0x%x, %lu\n ", chunk->max_size, chunk->max_size);
+          printf("[METADATA_PARSER DEBUG] Metadata read file offset is : 0x%x %lu\n", fpo, fpo);
+          printf("[METADATA_PARSER DEBUG] The address is : 0x%x, %lu\n", (uint64_t)chunk->device_parquet_address, (uint64_t)chunk->device_parquet_address);
+          printf("[METADATA_PARSER DEBUG] The num of values are :0x%x, %lu\n ", chunk->num_val, chunk->num_val);
+          printf("[METADATA_PARSER DEBUG] Uncompressed size are :0x%x, %lu\n ", chunk->max_size, chunk->max_size);
   }
   fletcher::Status FileReader::readChunks(PtoaRegs** chunks_r)
   {
@@ -81,7 +81,7 @@ namespace tpc
           std::vector<std::string> selected_cols = input_schema->field_names();
           std::vector<int> selected_indexes;
 
-          printf("[METADATA_PARSER DEBUG] Reading started\n");
+          //printf("[METADATA_PARSER DEBUG] Reading started\n");
           for (auto &col : selected_cols) // Select indexes
           {
                   //std::cout << "The col: " << col << " for index " << inferred_schema->ColumnIndex(col) << "\n";
@@ -99,7 +99,7 @@ namespace tpc
                   }
                   ++row_group_counter;
           }
-          printf("[METADATA_PARSER DEBUG] Reading done\n");
+          //printf("[METADATA_PARSER DEBUG] Reading done\n");
           return fletcher::Status::OK();
   }
   std::vector<std::vector<PtoaRegs>> FileReader::readChunks()
@@ -118,7 +118,7 @@ namespace tpc
           int x = 0;
           for (auto &r : rowGroupMetadata)
           {
-                  printf("[METADATA_PARSER DEBUG] Reading row group no %d\n", x++);
+                  //printf("[METADATA_PARSER DEBUG] Reading row group no %d\n", x++);
                   std::vector<PtoaRegs> chunks;
                   for (auto &i : selected_indexes)
                   {
@@ -128,7 +128,7 @@ namespace tpc
                   }
                   chunks_r.push_back(chunks);
           }
-          printf("[METADATA_PARSER DEBUG] Reading done\n");
+          //printf("[METADATA_PARSER DEBUG] Reading done\n");
           return chunks_r;
   }
   uint8_t *FileReader::returnFileData()

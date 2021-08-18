@@ -143,14 +143,20 @@ object App extends InitSpark {
               val query = "query_" + t + ".sql"
               val query_string =
                 new TPCQueries(spark, config.benchmark_type, query).load_query()
-              val result = spark.sqlContext.sql(query_string)
-              if (config.verbose == true)
-                result.explain(mode = "extended")
               if (config.extension == "fletcher")
-                //spark.time(result.select(col("revenue").reduce(_+_)).show())
-                spark.time(result.agg(sum("revenue")).show())
-              else
-                spark.time(result.show())
+              {
+                val result = spark.sqlContext.sql(query_string).agg(sum("revenue"))
+                if (config.verbose == true)
+                  result.explain(mode = "extended")
+                  spark.time(result.show())
+              }
+              else 
+              {
+                val result = spark.sqlContext.sql(query_string)
+                if (config.verbose == true)
+                  result.explain(mode = "extended")
+                  spark.time(result.collect())
+              }
             }
           case "generate_parquet" =>
             println("Generating parquet file")
@@ -176,27 +182,27 @@ object App extends InitSpark {
             println("Unknown mode.")
             sys.exit(1)
         }
-        var dur_list: ListBuffer[Seq[Long]] = ListBuffer()
-        var file_list: ListBuffer[Seq[Long]] = ListBuffer()
-        val counter: Int = 4
-        var i: Int = 0
-        var acc_d: Long = 0
-        var acc_f: Long = 0
-        metrics.remove(0)
-        println(metrics)
-        for (x <- metrics) {
-          if ((i > 0) && ((i % counter - 1) == 0)) {
-            dur_list += Seq[Long](acc_d / 4)
-            file_list += Seq[Long](acc_f / 4)
-            acc_d = 0
-            acc_f = 0
-          }
-          acc_f += x(0)
-          acc_d += x(2)
-          i += 1
-        }
-        println(dur_list)
-        println(file_list)
+        //var dur_list: ListBuffer[Seq[Long]] = ListBuffer()
+        //var file_list: ListBuffer[Seq[Long]] = ListBuffer()
+        //val counter: Int = 4
+        //var i: Int = 0
+        //var acc_d: Long = 0
+        //var acc_f: Long = 0
+        //metrics.remove(0)
+        //println(metrics)
+        //for (x <- metrics) {
+        //  if ((i > 0) && ((i % counter - 1) == 0)) {
+        //    dur_list += Seq[Long](acc_d / 4)
+        //    file_list += Seq[Long](acc_f / 4)
+        //    acc_d = 0
+        //    acc_f = 0
+        //  }
+        //  acc_f += x(0)
+        //  acc_d += x(2)
+        //  i += 1
+        //}
+        //println(dur_list)
+        //println(file_list)
         spark.close
       case _ =>
     }
