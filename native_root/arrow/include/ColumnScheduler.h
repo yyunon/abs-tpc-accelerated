@@ -446,17 +446,17 @@ namespace tpc
 		std::shared_ptr<fletcher::Platform> platform;
 		inline double RunInstanceProjection(PtoaRegs *regs)
 		{
-                        std::this_thread::sleep_for(std::chrono::milliseconds(10 * instance_index ));
+                        std::this_thread::sleep_for(std::chrono::milliseconds(10 * (instance_index % 3) ));
 			//printf("[THREAD NO %d]: Task running...\n", instance_index);
 			//We calculate the base offsets.
 			std::vector<uint64_t> base_offsets_;
 			for (int i = 0; i < (NUM_COLS + 1); ++i)
-				base_offsets_.push_back(tpc::calculate_reg_base_offset(i + (NUM_COLS + 1) * instance_index));
+				base_offsets_.push_back(tpc::calculate_reg_base_offset(i + (NUM_COLS + 1) * (instance_index % 3)));
 			ASSERT_FLETCHER_OK(p_w.Reset(platform, base_offsets_));
 			ASSERT_FLETCHER_OK(p_w.setPtoaArguments(platform, base_offsets_, regs));
 			ASSERT_FLETCHER_OK(p_w.Start(platform, base_offsets_));
-			ASSERT_FLETCHER_OK(p_w.WaitForFinish(platform, base_offsets_[NUM_COLS], instance_index * 500));
-			double result = p_w.ReadResult(platform, base_offsets_[NUM_COLS], instance_index * 100);
+			ASSERT_FLETCHER_OK(p_w.WaitForFinish(platform, base_offsets_[NUM_COLS], (instance_index % 3) * 10));
+			double result = p_w.ReadResult(platform, base_offsets_[NUM_COLS], (instance_index % 3) * 10);
 			//printf("[THREAD NO: %d]: Result is %f ...\n", instance_index, result);
 			return result;
 		}

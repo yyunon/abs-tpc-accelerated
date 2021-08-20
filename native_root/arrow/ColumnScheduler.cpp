@@ -24,7 +24,7 @@ namespace tpc
 		{
 			std::vector<std::future<double>> futures(chunk_size);
 			//futures.resize(chunks.size());
-			printf("[THREADS DEBUG]: %d number of tasks will be submitted\n", chunk_size);
+			//printf("[THREADS DEBUG]: %d number of tasks will be submitted\n", chunk_size);
 			for (int i = 0; i < chunk_size; ++i)
 			{       
                                 PtoaRegs* chunks_to_send = chunks[i];

@@ -148,7 +148,7 @@ object App extends InitSpark {
                 val result = spark.sqlContext.sql(query_string).agg(sum("revenue"))
                 if (config.verbose == true)
                   result.explain(mode = "extended")
-                  spark.time(result.show())
+                  spark.time(result.collect())
               }
               else 
               {

@@ -71,8 +71,8 @@ namespace tpc
     //printf("Native runtime\n");
     //printf("%.6f,%.6f\n", platform_w->duration_total, platform_w->duration_compute);
     //printf("%.6f,%.6f\n", t_total, t_compute);
-    printf("%.6f,%.6f\n", platform_w->duration_compute);
-    printf("%.6f,%.6f\n", t_compute);
+    printf("%.6f\n", platform_w->duration_compute);
+    printf("%.6f\n", t_compute);
 
   }
   
