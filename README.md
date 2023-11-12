@@ -4,5 +4,7 @@ Concurrent FPGA wrapper and Spark integration of accelerated parquet file readin
 
 # Components
 **fletcher**, is used for interfacing purposes with the hardware. It is the projects developed by ABS group.
+
 **native_root** is the native functionality used to interface the underlying platform. It can be any FPGA. It dispatches multiple threads that communicates with JVM engine. 
+
 **root** is the scala functionality that extens Apache Spark and communicates with JVM Native functions. 
